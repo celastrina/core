@@ -1,0 +1,20 @@
+{
+  "references": [
+    {"name": "mock_reference_resource", "key": "mock_resources", "type": "property" },
+    {"name": "mock_reference_permissions", "key": "mock_permissions", "type": "property"}
+  ],
+  "configurations": [
+    {
+      "name": "mock_configuration",
+      "resources": [
+        {"reference": "mock_reference_resource", "expand": true}
+      ],
+      "authentication": {
+        "optimistic": true,
+        "permissions": [
+          {"reference": "mock_reference_permissions", "expand": true}
+        ]
+      }
+    }
+  ]
+}
