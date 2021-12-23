@@ -23,7 +23,7 @@
  */
 const {CelastrinaError, LOG_LEVEL, Configuration, Subject, Sentry, Context, RoleFactory, Permission,
        MatchNone} = require("../Core");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const assert = require("assert");
 
 class MockRoleFactory extends RoleFactory {

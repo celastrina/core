@@ -23,7 +23,7 @@
  */
 const {instanceOfCelastringType, CelastrinaError, LOG_LEVEL, Configuration, PropertyManager, CachedPropertyManager,
 	   PropertyManagerFactory} = require("../Core");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
 const assert = require("assert");
 

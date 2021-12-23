@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 const {CelastrinaError, CelastrinaValidationError, Configuration, CelastrinaEvent} = require("../Core");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockContext} = require("./ContextTest");
 const assert = require("assert");
 const moment = require("moment");
