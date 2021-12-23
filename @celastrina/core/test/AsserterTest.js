@@ -24,7 +24,7 @@
 const {CelastrinaError, CelastrinaValidationError, Configuration, Permission, PermissionManager, Subject,
        Asserter} = require("../Core");
 const {MockContext} = require("./ContextTest");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
 const assert = require("assert");
 

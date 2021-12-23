@@ -1258,7 +1258,6 @@ class PropertyManagerFactory {
             let _unit = "minutes";
             let _config = [];
             if(_cache.hasOwnProperty("active") && typeof _cache.active === "boolean" && _cache.active) {
-                /**@type{CachedProperty}*/let cache = source.cache;
                 if(_cache.hasOwnProperty("ttl") && typeof _cache.ttl === "number")
                     _ttl = _cache.ttl;
                 if(_cache.hasOwnProperty("unit") && typeof _cache.unit === "string" && _cache.unit.trim().length > 0)
@@ -1984,7 +1983,6 @@ class AddOnManager {
             azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-Ons, JSON configuration mode " + parse + ".");
             let _pass = 0;
             while(_pass < this._depth) {
-                let _td = this._target.length;
                 for(let _addon of this._unresolved.values()) {
                     this.add(_addon);
                 }

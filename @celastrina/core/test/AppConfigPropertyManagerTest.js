@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 const {CelastrinaError, LOG_LEVEL, AppConfigPropertyManager, Configuration, ManagedIdentityResource, ResourceManager} = require("../Core");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
 const MockAdapter = require("axios-mock-adapter");
 const assert = require("assert");

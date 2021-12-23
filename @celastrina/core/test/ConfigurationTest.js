@@ -25,7 +25,7 @@ const {CelastrinaError, AddOn, Configuration, AppSettingsPropertyManager, AppCon
        ResourceManager, PermissionManager, AttributeParser, ConfigParser, CelastrinaValidationError,
        AppRegistrationResource, Permission, MatchAny, MatchAll, MatchNone, AppConfigPropertyManager,
        ManagedIdentityResource, ResourceAuthorization} = require("../Core");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
 const {MockResourceManager} = require("./ResourceAuthorizationTest");
 const assert = require("assert");

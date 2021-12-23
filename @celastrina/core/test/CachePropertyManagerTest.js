@@ -24,7 +24,7 @@
 const {CelastrinaError, LOG_LEVEL, PropertyManager, CacheProperty, AppSettingsPropertyManager,
        CachedPropertyManager} = require("../Core");
 const {MockPropertyManager} = require("./PropertyManagerTest");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const assert = require("assert");
 const sinon = require("sinon");
 const moment = require("moment");
