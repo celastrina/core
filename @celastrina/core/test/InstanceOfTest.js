@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-const {instanceOfCelastringType} = require("../Core");
+const {instanceOfCelastrinaType} = require("../Core");
 const assert = require("assert");
 
 class MockTypeA {
@@ -39,28 +39,28 @@ class MockTypeC {
 describe("instanceOfCelastringType", () => {
     describe("works correctly!", () => {
         it("should fail type null", () => {
-            assert.strictEqual(instanceOfCelastringType(null, new MockTypeA()), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(null, new MockTypeA()), false, "Expected false.");
         });
         it("should fail source null", () => {
-            assert.strictEqual(instanceOfCelastringType(MockTypeA, null), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(MockTypeA, null), false, "Expected false.");
         });
         it("should fail gracefully, both null", () => {
-            assert.strictEqual(instanceOfCelastringType(null, null), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(null, null), false, "Expected false.");
         });
         it("should fail source not an object, numeric", () => {
-            assert.strictEqual(instanceOfCelastringType(MockTypeA, 100), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(MockTypeA, 100), false, "Expected false.");
         });
         it("should fail source not an object, string", () => {
-            assert.strictEqual(instanceOfCelastringType(MockTypeA, "100"), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(MockTypeA, "100"), false, "Expected false.");
         });
         it("should fail non-celatrina type", () => {
-            assert.strictEqual(instanceOfCelastringType(MockTypeA, new MockTypeC()), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(MockTypeA, new MockTypeC()), false, "Expected false.");
         });
         it("should fail celatrina type different", () => {
-            assert.strictEqual(instanceOfCelastringType(MockTypeA, new MockTypeB()), false, "Expected false.");
+            assert.strictEqual(instanceOfCelastrinaType(MockTypeA, new MockTypeB()), false, "Expected false.");
         });
         it("should pass celatrina type same", () => {
-            assert.strictEqual(instanceOfCelastringType(MockTypeA, new MockTypeA()), true, "Expected true.");
+            assert.strictEqual(instanceOfCelastrinaType(MockTypeA, new MockTypeA()), true, "Expected true.");
         });
     });
 });
