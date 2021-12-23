@@ -24,7 +24,7 @@
 const {CelastrinaError, ResourceAuthorization, ManagedIdentityResource, ResourceManagerTokenCredential, ResourceManager, Configuration} = require("../Core");
 const assert = require("assert");
 const moment = require("moment");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockResourceAuthorization} = require("./ResourceAuthorizationTest");
 
 describe("ResourceManagerTokenCredential", () => {

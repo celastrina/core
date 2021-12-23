@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 const {CelastrinaError, AddOn, Configuration, LifeCycle, AddOnManager} = require("../Core");
-const {MockAzureFunctionContext} = require("../../test/AzureFunctionContextMock");
+const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
 const {MockResourceManager} = require("./ResourceAuthorizationTest");
 const assert = require("assert");
