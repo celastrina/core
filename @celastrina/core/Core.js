@@ -78,7 +78,7 @@ const LOG_LEVEL = {TRACE: 0, VERBOSE: 1, INFO: 2, WARN: 3, ERROR: 4, THREAT: 5};
  * @param {Object} _object The object instance you would like to check.
  * @return {boolean} True, if the target types is equalt to source type, false otherwise.
  */
-function instanceOfCelastringType(_class, _object) {
+function instanceOfCelastrinaType(_class, _object) {
     if(((typeof _class === "undefined" || _class === null)) || ((typeof _object !== "object") || _object == null)) return false;
     let _otype = _object.constructor.celastrinaType;
     let _ctype = _class.celastrinaType;
@@ -147,7 +147,7 @@ class CelastrinaError extends Error {
         let ex = error;
         if(typeof ex === "undefined" || ex == null)
             return new CelastrinaError("Unhandled Exception.", code, drop);
-        if(instanceOfCelastringType(CelastrinaError, ex))
+        if(instanceOfCelastrinaType(CelastrinaError, ex))
             return ex;
         else if(typeof ex === "string" || typeof ex === "number"  || typeof ex === "boolean")
             return new CelastrinaError(ex, code, drop);
@@ -199,7 +199,7 @@ class CelastrinaValidationError extends CelastrinaError {
         let ex = error;
         if(typeof ex === "undefined")
             return new CelastrinaValidationError("Unhandled Exception.", code, drop, tag);
-        if(instanceOfCelastringType(CelastrinaValidationError, ex))
+        if(instanceOfCelastrinaType(CelastrinaValidationError, ex))
             return ex;
         else if(typeof ex === "string" || typeof ex === "number"  || typeof ex === "boolean")
             return new CelastrinaValidationError(ex, code, drop, tag);
@@ -537,7 +537,7 @@ class ResourceManager {
      */
      getResourceSync(id = ManagedIdentityResource.MANAGED_IDENTITY) {
         let _auth = this._resources[id];
-        if(!instanceOfCelastringType(ResourceAuthorization, _auth)) return null;
+        if(!instanceOfCelastrinaType(ResourceAuthorization, _auth)) return null;
         else return _auth;
     }
     /**
@@ -873,14 +873,14 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
         }
         /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
         this._authProp = await _rm.getResource(this._propResource);
-        if(!instanceOfCelastringType(ResourceAuthorization, this._authProp))
+        if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
             throw CelastrinaError.newError(
                 "Property resource authorization '" + this._propResource + "' not found. AppConfigPropertyManager initialization failed.");
         if(this._useVaultSecrets) {
             if(this._vaultResource === this._propResource) this._authVault = this._authProp;
             else {
                 this._authVault = await _rm.getResource(this._vaultResource);
-                if(!instanceOfCelastringType(ResourceAuthorization, this._authProp))
+                if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
                     throw CelastrinaError.newError(
                         "Vault resource authorization '" + this._vaultResource + "' not found. AppConfigPropertyManager initialization failed.");
             }
@@ -948,7 +948,7 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
                 return _value.value;
         }
         catch(exception) {
-            if(instanceOfCelastringType(CelastrinaError, exception))
+            if(instanceOfCelastrinaType(CelastrinaError, exception))
                 throw exception;
             else if(typeof exception === "object" && exception.hasOwnProperty("response")) {
                 if(exception.response.status === 404)
@@ -1077,7 +1077,7 @@ class CachedPropertyManager extends PropertyManager {
         for(let prop in this._cache) {
             if(this._cache.hasOwnProperty(prop)) {
                 /**@type{CacheProperty}*/let cached = this._cache[prop];
-                if(instanceOfCelastringType(CacheProperty, cached) && cached.cache) promises.unshift(cached.clear());
+                if(instanceOfCelastrinaType(CacheProperty, cached) && cached.cache) promises.unshift(cached.clear());
             }
         }
         await Promise.all(promises);
@@ -1106,7 +1106,7 @@ class CachedPropertyManager extends PropertyManager {
      */
     async getCacheInfo(key) {
         /**@type{CacheProperty}*/let cached = this._cache[key];
-        if(!instanceOfCelastringType(CacheProperty, cached)) return null;
+        if(!instanceOfCelastrinaType(CacheProperty, cached)) return null;
         else return cached;
     }
     /**
@@ -1143,7 +1143,7 @@ class CachedPropertyManager extends PropertyManager {
      */
     async _getCache(key, defaultValue, func, construct) {
         /**@type{CacheProperty}*/let cached  = this._cache[key];
-        if(!instanceOfCelastringType(CacheProperty, cached))
+        if(!instanceOfCelastrinaType(CacheProperty, cached))
             return this._createCache(key, defaultValue, func, construct);
         else if(!cached.cache)
             return this._getPropertyFromSource(key, defaultValue, func, construct);
@@ -1377,7 +1377,7 @@ class ParserChain {
      * @param {ParserChain} link
      */
     addLink(link) {
-        if(instanceOfCelastringType(ParserChain, link)) {
+        if(instanceOfCelastrinaType(ParserChain, link)) {
             if((link._mime !== this._mime) || (link._type !== this._type) || (link._version !== this._version)) {
                 (this._link == null) ? this._link = link : this._link.addLink(link);
             }
@@ -1798,9 +1798,9 @@ class CoreConfigParser extends ConfigParser {
      */
     async _createPrincipalMappings(_Object) {
         /**@type{ResourceManager}*/let _rm = this._config[Configuration.CONFIG_RESOURCE];
-        if(instanceOfCelastringType(ResourceManager, _rm)) {
+        if(instanceOfCelastrinaType(ResourceManager, _rm)) {
             /**@type{ManagedIdentityResource}*/let _mi = /**@type{ManagedIdentityResource}*/await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
-            if(instanceOfCelastringType(ManagedIdentityResource, _mi)) {
+            if(instanceOfCelastrinaType(ManagedIdentityResource, _mi)) {
                 if(_Object.hasOwnProperty("resources") && (typeof _Object.resources === "object") &&
                     _Object.resources != null) {
                     let _resobj = _Object.resources;
@@ -2205,7 +2205,7 @@ class Configuration {
      * @return {Configuration}
      */
     addOn(addon) {
-        if(!instanceOfCelastringType(AddOn, addon))
+        if(!instanceOfCelastrinaType(AddOn, addon))
             throw CelastrinaValidationError.newValidationError("Argument 'addon' is required and must be of type '" +
                 AddOn.celastrinaType + "'.", "addon");
         this._addons.add(addon);
@@ -2393,12 +2393,12 @@ class Configuration {
                 this._config[Configuration.CONFIG_PROPERTY] = _manager;
             }
             else {
-                if(instanceOfCelastringType(PropertyManagerFactory, _manager)) {
+                if(instanceOfCelastrinaType(PropertyManagerFactory, _manager)) {
                     /**@type{PropertyManagerFactory}*/let _factory = /**@type{PropertyManagerFactory}*/_manager;
                     _manager = _factory.createPropertyManager();
                     this._config[Configuration.CONFIG_PROPERTY] = _manager;
                 }
-                else if(!instanceOfCelastringType(PropertyManager, _manager)) {
+                else if(!instanceOfCelastrinaType(PropertyManager, _manager)) {
                     azcontext.log.error("[Configuration._getPropertyManager(azcontext)]: Invalid property manager. Must be of type '" + PropertyManager.celastrinaType + "'");
                     throw CelastrinaError.newError("Invalid property manager.");
                 }
@@ -3147,7 +3147,7 @@ class Sentry {
      * @return {Sentry}
      */
     addAuthenticator(authenticator) {
-        if(!instanceOfCelastringType(Authenticator, authenticator))
+        if(!instanceOfCelastrinaType(Authenticator, authenticator))
             throw CelastrinaValidationError.newValidationError("Argument 'authenticator' must be type Authenticator.", "authenticator");
         authenticator.timeout = this._timeout;
         if(this._authenticator == null) this._authenticator = authenticator;
@@ -3159,7 +3159,7 @@ class Sentry {
      * @return {Sentry}
      */
     addAuthorizor(authorizor) {
-        if(!instanceOfCelastringType(Authorizor, authorizor))
+        if(!instanceOfCelastrinaType(Authorizor, authorizor))
             throw CelastrinaValidationError.newValidationError("Argument 'authorizor' must be type Authorizor.", "authorizor");
         authorizor.timeout = this._timeout;
         if(this._authorizor == null) this._authorizor = authorizor;
@@ -3623,7 +3623,7 @@ class BaseFunction extends CelastrinaFunction {
     _unhandled(context, exception) {
         /**@type{(exception|Error|CelastrinaError|*)}*/let ex = exception;
         if(typeof ex === "undefined" || ex == null) ex = CelastrinaError.newError("Unhandled server error.");
-        else if(!instanceOfCelastringType(CelastrinaError, ex)) {
+        else if(!instanceOfCelastrinaType(CelastrinaError, ex)) {
             if(ex instanceof Error) ex = CelastrinaError.wrapError(ex);
             else ex = CelastrinaError.newError(ex);
         }
@@ -3634,7 +3634,7 @@ class BaseFunction extends CelastrinaFunction {
 }
 module.exports = {
     getDefaultTimeout,
-    instanceOfCelastringType,
+    instanceOfCelastrinaType,
     CelastrinaError: CelastrinaError,
     CelastrinaValidationError: CelastrinaValidationError,
     CelastrinaEvent: CelastrinaEvent,

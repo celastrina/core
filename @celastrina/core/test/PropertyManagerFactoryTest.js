@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-const {instanceOfCelastringType, CelastrinaError, LOG_LEVEL, Configuration, PropertyManager, CachedPropertyManager,
+const {instanceOfCelastrinaType, CelastrinaError, LOG_LEVEL, Configuration, PropertyManager, CachedPropertyManager,
 	   PropertyManagerFactory} = require("../Core");
 const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
@@ -64,7 +64,7 @@ describe("PropertyManagerFactory", () => {
 			process.env["celastrinajs.core.property.config"] = "{\"sample\": \"value\"}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), false, "Expected false.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), false, "Expected false.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			delete process.env["celastrinajs.core.property.config"];
@@ -73,7 +73,7 @@ describe("PropertyManagerFactory", () => {
 			process.env["celastrinajs.core.property.config"] = "{\"sample\": \"value\", \"cache\": {\"active\": true}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			delete process.env["celastrinajs.core.property.config"];
@@ -82,7 +82,7 @@ describe("PropertyManagerFactory", () => {
 			process.env["celastrinajs.core.property.config"] = "{\"sample\": \"value\", \"cache\": {\"active\": true, \"ttl\": 10}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			assert.strictEqual(_pm.defaultTimeout, 10, "Expected 10.");
@@ -92,7 +92,7 @@ describe("PropertyManagerFactory", () => {
 			process.env["celastrinajs.core.property.config"] = "{\"sample\": \"value\", \"cache\": {\"active\": true, \"unit\": \"hours\"}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			assert.strictEqual(_pm.defaultUnit, "hours", "Expected 'hours'.");
@@ -102,7 +102,7 @@ describe("PropertyManagerFactory", () => {
 			process.env["celastrinajs.core.property.config"] = "{\"sample\": \"value\", \"cache\": {\"active\": true, \"ttl\":10, \"unit\": \"seconds\"}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			assert.strictEqual(_pm.defaultTimeout, 10, "Expected 10.");
@@ -114,7 +114,7 @@ describe("PropertyManagerFactory", () => {
 				"{\"sample\": \"value\", \"cache\": {\"active\": true, \"controls\": [{\"key\": \"mock_prop_one\", \"ttl\": 30, \"unit\": \"seconds\"}]}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			assert.strictEqual(_pm.defaultTimeout, 5, "Expected 5.");
@@ -131,7 +131,7 @@ describe("PropertyManagerFactory", () => {
 				"{\"sample\": \"value\", \"cache\": {\"active\": true, \"controls\": [{\"key\": \"mock_prop_two\", \"noCache\": true}]}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			assert.strictEqual(_pm.defaultTimeout, 5, "Expected 5.");
@@ -146,7 +146,7 @@ describe("PropertyManagerFactory", () => {
 				"{\"sample\": \"value\", \"cache\": {\"active\": true, \"controls\": [{\"key\": \"mock_prop_three\", \"noExpire\": true}]}}";
 			let _factory = new MockPropertyManagerFactory();
 			/**@type{MockPropertyManager}*/let _pm = /**@type{MockPropertyManager}*/_factory.createPropertyManager();
-			assert.strictEqual(instanceOfCelastringType(CachedPropertyManager, _pm), true, "Expected true.");
+			assert.strictEqual(instanceOfCelastrinaType(CachedPropertyManager, _pm), true, "Expected true.");
 			assert.strictEqual(_factory.createPropertyManagerInvoked, true, "Expected true.");
 			assert.strictEqual(_factory.hasSampleProperty, true, "Expected true.");
 			assert.strictEqual(_pm.defaultTimeout, 5, "Expected 5.");
