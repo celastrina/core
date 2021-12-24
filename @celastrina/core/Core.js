@@ -31,8 +31,8 @@ const axios  = require("axios");
 const moment = require("moment");
 const { v4: uuidv4 } = require("uuid");
 const crypto = require("crypto");
-const {TokenResponse, AuthenticationContext} = require("adal-node");
-const {TokenCredentials, AccessToken, GetTokenOptions} = require("@azure/identity");
+const {AuthenticationContext} = require("adal-node");
+const {AccessToken} = require("@azure/identity");
 /**
  * @typedef _ManagedResourceToken
  * @property {string} access_token
@@ -1036,8 +1036,15 @@ class CacheProperty {
         else if(this._expires == null) return false;
         else return moment().isSameOrAfter(this._expires);
     }
-    /**@return{Promise<void>}*/
-    async clear() {this._value = null; this._expires = null;}
+    /**
+     * @return{Promise<void>}
+     */
+    async clear() {
+        if(this._cache) {
+            this._value = null;
+            this._lastUpdate = null;
+        }
+    }
 }
 /**
  * CachedPropertyManager
@@ -1102,9 +1109,26 @@ class CachedPropertyManager extends PropertyManager {
     }
     /**
      * @param {string} key
+     * @param {CacheProperty} cache
+     * @return {Promise<void>}
+     */
+    setCacheInfo(key, cache) {
+        if(!instanceOfCelastrinaType(CacheProperty, cache))
+            throw CelastrinaValidationError.newValidationError("Argument 'cache' is required.", "cache");
+        this._cache[key] = cache;
+    }
+    /**
+     * @param {string} key
      * @return {Promise<CacheProperty>}
      */
     async getCacheInfo(key) {
+        return this.getCacheInfoSync(key);
+    }
+    /**
+     * @param {string} key
+     * @return {CacheProperty}
+     */
+    getCacheInfoSync(key) {
         /**@type{CacheProperty}*/let cached = this._cache[key];
         if(!instanceOfCelastrinaType(CacheProperty, cached)) return null;
         else return cached;
@@ -1706,6 +1730,47 @@ class PrincipalMappingParser extends AttributeParser {
     }
 }
 /**
+ * CachePropertyParser
+ * @author Robert R Murrell
+ */
+class CachePropertyParser extends AttributeParser {
+    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CachePropertyParser";}
+    /**
+     * @param {AttributeParser} link
+     * @param {string} [type="PrincipalMapping"]
+     * @param {string} [version="1.0.0"]
+     */
+    constructor(link = null, type = "CacheProperty", version = "1.0.0") {
+        super(type, link, version);
+    }
+    /**
+     * @param {Object} _CacheProperty
+     * @return {Promise<{key:string, cache:CacheProperty}>}
+     */
+    async _create(_CacheProperty) {
+        if(!_CacheProperty.hasOwnProperty("key") || typeof _CacheProperty.key !== "string" ||
+                _CacheProperty.key.trim().length === 0)
+            throw CelastrinaValidationError.newValidationError("Attribute 'key' is required.",
+                                                                       "_CacheProperty.key");
+        let _cache = {key: _CacheProperty.key.trim(), cache: new CacheProperty()};
+        if(_CacheProperty.hasOwnProperty("noCache") && typeof _CacheProperty.noCache === "boolean" &&
+                _CacheProperty.noCache)
+            _cache.cache.setNoCache();
+        else if(_CacheProperty.hasOwnProperty("noExpire") && typeof _CacheProperty.noExpire === "boolean" &&
+                _CacheProperty.noExpire) {
+            _cache.cache.setNoExpire();
+        }
+        else {
+            if(_CacheProperty.hasOwnProperty("ttl") && typeof _CacheProperty.ttl === "number")
+                _cache.cache.time = _CacheProperty.ttl;
+            if(_CacheProperty.hasOwnProperty("unit") && typeof _CacheProperty.unit === "string" &&
+                    _CacheProperty.unit.trim().length === 0)
+                _cache.cache.unit = /**@type{moment.DurationInputArg2}*/_CacheProperty.unit.trim();
+        }
+        return _cache;
+    }
+}
+/**
  * ConfigParser
  * @author Robert R Murrell
  * @abstract
@@ -1736,25 +1801,21 @@ class CoreConfigParser extends ConfigParser {
         super("Core", link, version);
     }
     /**
-     * @param _Object
+     * @param {Object} _Resources
+     * @param {ResourceManager} _rm
      * @return {Promise<void>}
      * @private
      */
-    async _createResources(_Object) {
-        if(_Object.hasOwnProperty("resources") && (typeof _Object.resources === "object") &&
-                _Object.resources != null) {
-            /**@type{ResourceManager}*/let _rm = this._config[Configuration.CONFIG_RESOURCE];
-            let _resobj = _Object.resources;
-            if(_resobj.hasOwnProperty("timeout") && typeof _resobj.timeout === "number") {
-                if(_resobj.timeout < 0) _resobj.timeout = getDefaultTimeout();
-                _rm.defaultTimeout = _resobj.timeout;
-            }
-            if(_resobj.hasOwnProperty("authorizations") && Array.isArray(_resobj.authorizations) &&
-                    _resobj.authorizations != null) {
-                /**@type{Array<ResourceAuthorization>}*/let _Authorizations = _resobj.authorizations;
-                for (/**@type{ResourceAuthorization}*/let _ra of _Authorizations) {
-                    _rm.addResource(_ra);
-                }
+    async _createResources(_Resources, _rm) {
+        if(_Resources.hasOwnProperty("timeout") && typeof _Resources.timeout === "number") {
+            if(_Resources.timeout < 0) _Resources.timeout = getDefaultTimeout();
+            _rm.defaultTimeout = _Resources.timeout;
+        }
+        if(_Resources.hasOwnProperty("authorizations") && Array.isArray(_Resources.authorizations) &&
+                _Resources.authorizations != null) {
+            /**@type{Array<ResourceAuthorization>}*/let _Authorizations = _Resources.authorizations;
+            for (/**@type{ResourceAuthorization}*/let _ra of _Authorizations) {
+                _rm.addResource(_ra);
             }
         }
     }
@@ -1792,28 +1853,69 @@ class CoreConfigParser extends ConfigParser {
         }
     }
     /**
-     * @param _Object
+     * @param {Object} _Resources
+     * @param {ResourceManager} _rm
      * @return {Promise<void>}
      * @private
      */
-    async _createPrincipalMappings(_Object) {
-        /**@type{ResourceManager}*/let _rm = this._config[Configuration.CONFIG_RESOURCE];
-        if(instanceOfCelastrinaType(ResourceManager, _rm)) {
-            /**@type{ManagedIdentityResource}*/let _mi = /**@type{ManagedIdentityResource}*/await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
-            if(instanceOfCelastrinaType(ManagedIdentityResource, _mi)) {
-                if(_Object.hasOwnProperty("resources") && (typeof _Object.resources === "object") &&
-                    _Object.resources != null) {
-                    let _resobj = _Object.resources;
-                    if(_resobj.hasOwnProperty("identity") && (typeof _resobj.identity === "object") &&
-                        _resobj.identity != null) {
-                        let _idntty = _resobj.identity;
-                        if(_idntty.hasOwnProperty("mappings") && Array.isArray(_idntty.mappings) &&
-                                _idntty.mappings != null) {
-                            for(let _mapping of _idntty.mappings) {
-                                _mi.addResourceMappingObject(_mapping);
-                            }
-                        }
+    async _createPrincipalMappings(_Resources, _rm) {
+        /**@type{ManagedIdentityResource}*/let _mi =
+            /**@type{ManagedIdentityResource}*/await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
+        if(instanceOfCelastrinaType(ManagedIdentityResource, _mi)) {
+            if(_Resources.hasOwnProperty("identity") && (typeof _Resources.identity === "object") &&
+                _Resources.identity != null) {
+                let _idntty = _Resources.identity;
+                if(_idntty.hasOwnProperty("mappings") && Array.isArray(_idntty.mappings) &&
+                        _idntty.mappings != null) {
+                    for(let _mapping of _idntty.mappings) {
+                        _mi.addResourceMappingObject(_mapping);
                     }
+                }
+            }
+        }
+    }
+    /**
+     * @param {Object} _Object
+     * @return {Promise<void>}
+     * @private
+     */
+    async _createCacheSettings(_Object) {
+        if(_Object.hasOwnProperty("properties") && (typeof _Object.properties === "object") &&
+                _Object.properties != null) {
+            let _properties = _Object.properties;
+            if(_properties.hasOwnProperty("cache") && (typeof _properties.cache === "object") &&
+                    _properties.cache != null) {
+                let _cache = _properties.cache;
+                /**@type{(CachedPropertyManager|PropertyManager)}*/let _pm = this._config[Configuration.CONFIG_PROPERTY];
+                /**@type{Object}*/let _azcontext = this._config[Configuration.CONFIG_CONTEXT];
+                let _ttl = 5;
+                let _unit = "minutes";
+                if(_cache.hasOwnProperty("ttl") && typeof _cache.ttl === "number")
+                    _ttl = _cache.ttl;
+                if(_cache.hasOwnProperty("unit") && typeof _cache.unit === "string" && _cache.unit.trim().length > 0)
+                    _unit = _cache.unit.trim();
+                if(!instanceOfCelastrinaType(CachedPropertyManager, _pm)) {
+                    _azcontext.log.info("[CoreConfigParser._createCacheSettings(_Object)]: Cache directive found in JSON configuration, enabling property cache.");
+                    _pm = new CachedPropertyManager(_pm, _ttl, _unit);
+                    this._config[Configuration.CONFIG_PROPERTY] = _pm;
+                    _azcontext.log.info("[CoreConfigParser._createCacheSettings(_Object)]: Cache initialized.");
+                }
+                else {
+                    if(_pm.defaultTimeout !== _ttl || _pm.defaultUnit !== _unit) {
+                        _azcontext.log.info("[CoreConfigParser._createCacheSettings(_Object)]: Resetting cache default timeout to " +
+                                            _ttl + " " + _unit + ".");
+                        _pm.defaultTimeout = _ttl;
+                        _pm.defaultUnit = _unit;
+                        await _pm.clear();
+                        _azcontext.log.info("[CoreConfigParser._createCacheSettings(_Object)]: Cache cleared.");
+                    }
+                }
+                if(_cache.hasOwnProperty("controls") && (Array.isArray(_cache.controls))) {
+                    let _promises = []
+                    for(let _control of _cache.controls) {
+                        _promises.unshift(_pm.setCacheInfo(_control.key, _control.cache));
+                    }
+                    await Promise.all(_promises);
                 }
             }
         }
@@ -1825,8 +1927,14 @@ class CoreConfigParser extends ConfigParser {
      */
     async _create(_Object) {
         let _promises = [];
-        _promises.unshift(this._createResources(_Object));
-        _promises.unshift(this._createPrincipalMappings(_Object));
+        _promises.unshift(this._createCacheSettings(_Object));
+        if(_Object.hasOwnProperty("resources") && (typeof _Object.resources === "object") &&
+                _Object.resources != null) {
+            let _resobj = _Object.resources;
+            /**@type{ResourceManager}*/let _rm = this._config[Configuration.CONFIG_RESOURCE];
+            _promises.unshift(this._createResources(_resobj, _rm));
+            _promises.unshift(this._createPrincipalMappings(_resobj, _rm));
+        }
         _promises.unshift(this._createAuthentication(_Object));
         _promises.unshift(this._createRoleFactory(_Object));
         await Promise.all(_promises);
@@ -1864,6 +1972,8 @@ class AddOn {
  * @author Robert R Murrell
  */
 class LifeCycle {
+    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.LifeCycle";}
+    /**@return{string}*/static get version() {return "1.0.0";}
     /**
      * @type {{AUTHENTICATE: number, TERMINATE: number, INITIALIZE: number, AUTHORIZE: number, LOAD: number,
      *         MONITOR: number, PROCESS: number, EXCEPTION: number, VALIDATE: number, SAVE: number}}
@@ -1980,7 +2090,8 @@ class AddOnManager {
      */
     async install(azcontext, parse = false, cfp = null, atp = null) {
         if(this._target.length > 0 || this._unresolved.size > 0) {
-            azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-Ons, JSON configuration mode " + parse + ".");
+            azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On's, JSON configuration mode " +
+                               parse + ".");
             let _pass = 0;
             while(_pass < this._depth) {
                 for(let _addon of this._unresolved.values()) {
@@ -2002,7 +2113,8 @@ class AddOnManager {
             }
             else {
                 for(let _addon of this._target) {
-                    azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On '" + _addon.constructor.addOnName + "'.");
+                    azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On " +
+                        _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
                     if(parse) {
                         let _acfp = _addon.getConfigParser();
                         if(_acfp != null) cfp.addLink(_acfp);
@@ -2021,6 +2133,7 @@ class AddOnManager {
                         }
                     }
                 }
+                azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Add-On's installed successfully.");
             }
         }
     }
@@ -2030,22 +2143,27 @@ class AddOnManager {
      */
     async initialize(azcontext, config) {
         if(this._target.length > 0) {
-            azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Initializing Add-Ons.");
+            azcontext.log.info("[AddOnManager.initialize(azcontext, parse, cfp, atp)]: Initializing Add-On's.");
             let _promises = [];
-            for(let _addon of this._target) {
-                azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On '" + _addon.constructor.addOnName + "'.");
+            for(/**@type{AddOn}*/let _addon of this._target) {
+                azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On " +
+                    _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
                 _promises.push(_addon.initialize(azcontext, config));
             }
             await Promise.all(_promises);
-            // Clean up all the un-needed data.
-            delete this._target;
+            azcontext.log.info("[AddOnManager.initialize(azcontext, parse, cfp, atp)]: Add-On initialization successful.");
         }
     }
-    async ready() {
+    /**
+     * @param {Object} azcontext
+     * @return {Promise<void>}
+     */
+    async ready(azcontext) {
         this._ready = true;
         delete this._target;
         this._unresolved.clear();
         delete this._unresolved;
+        azcontext.log.info("[AddOnManager.ready(azcontext)]: Add-On's ready.");
     }
 }
 /**
@@ -2453,7 +2571,8 @@ class Configuration {
                 new PermissionParser(
                     new AppRegistrationResourceParser(
                         new RoleFactoryParser(
-                            new PrincipalMappingParser()))));
+                            new PrincipalMappingParser(
+                                new CachePropertyParser())))));
             /**@type{ConfigParser}*/this._cfp = new CoreConfigParser();
         }
     }
@@ -2471,7 +2590,7 @@ class Configuration {
     async initialize(azcontext) {
         this._config[Configuration.CONFIG_CONTEXT] = azcontext;
         if(!this._loaded) {
-            azcontext.log.info("[" + azcontext.bindingData.invocationId + "][Configuration.initialize(azcontext)]: Initializing Celastrina.");
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Initializing Celastrina by request " + azcontext.bindingData.invocationId + ".");
             let _name = this._config[Configuration.CONFIG_NAME];
             if(typeof _name !== "string" || _name.trim().length === 0 || _name.indexOf(" ") >= 0) {
                 azcontext.log.error("[Configuration.load(azcontext)]: Invalid Configuration. Name cannot be undefined, null, or empty.");
@@ -2481,33 +2600,33 @@ class Configuration {
             /**@type{PropertyManager}*/let _pm = this._getPropertyManager(azcontext);
             /**@type{PermissionManager}*/let _prm = this._getPermissionManager(azcontext);
             /**@type{ResourceManager}*/let _rm = this._getResourceManager(azcontext);
-
             await _pm.initialize(azcontext, this._config);
             await this._initPropertyLoader();
             await this._installAddOns(azcontext);
             await this._initLoadConfiguration(azcontext);
+            _pm = this._config[Configuration.CONFIG_PROPERTY]; // Reload the PropertyManager from config because it could have changed
             await _pm.ready(azcontext, this._config); // Ready the property manager
             await _prm.initialize(azcontext, _prm);
             await _rm.initialize(azcontext, _rm);
             await _prm.ready(azcontext, this._config);
             await _rm.ready(azcontext, this._config);
             await this._initRoleFactory();
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Initialization Sentry.");
             await this._initSentry();
             await this._initAddOns(azcontext);
             await this.afterInitialize(azcontext, _pm, _rm);
-            azcontext.log.info("[" + azcontext.bindingData.invocationId + "][Configuration.initialize(azcontext)]: Initialization successful.");
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Initialization successful.");
+            this._loaded = true;
+            await this._addons.ready(azcontext);
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Celastrina ready.");
         }
     }
-    /**
-     * @return{Promise<void>}
-     */
-    async ready(azcontext) {
-        this._loaded = true;
-        await this._addons.ready();
-        azcontext.log.info("[" + azcontext.bindingData.invocationId + "][Configuration.initialize(azcontext)]: Celastrina ready.");
-    }
 }
-/**@abstract*/
+/**
+ * Algorithm
+ * @author Robert R Murrell
+ * @abstract
+ */
 class Algorithm {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Algorithm";}
     /**
@@ -3447,7 +3566,6 @@ class BaseFunction extends CelastrinaFunction {
         }
         await _context.initialize();
         this._context = _context;
-        await this._configuration.ready(azcontext);
     }
     /**
      * @param {Context} context
@@ -3635,10 +3753,10 @@ class BaseFunction extends CelastrinaFunction {
 module.exports = {
     getDefaultTimeout,
     instanceOfCelastrinaType,
+    LOG_LEVEL,
     CelastrinaError: CelastrinaError,
     CelastrinaValidationError: CelastrinaValidationError,
     CelastrinaEvent: CelastrinaEvent,
-    LOG_LEVEL: LOG_LEVEL,
     ResourceAuthorization: ResourceAuthorization,
     ManagedIdentityResource: ManagedIdentityResource,
     AppRegistrationResource: AppRegistrationResource,
@@ -3655,6 +3773,7 @@ module.exports = {
     AttributeParser: AttributeParser,
     RoleFactoryParser: RoleFactoryParser,
     PrincipalMappingParser: PrincipalMappingParser,
+    CachePropertyParser: CachePropertyParser,
     ConfigParser: ConfigParser,
     LifeCycle: LifeCycle,
     AddOnManager: AddOnManager,

@@ -175,7 +175,6 @@ describe("AddOnManager", () => {
 			_config.addOn(_addon);
 			_config.addOn(_addon2);
 			await _config.initialize(_azcontext);
-			await _config.ready(_azcontext);
 			let _context = new MockContext(_config);
 
 			await _config.addOns.doLifeCycle(LifeCycle.STATE.INITIALIZE, null, _context);

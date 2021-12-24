@@ -1,36 +1,27 @@
 {
   "configurations": [
     {
-      "_content": {
-        "type": "application/vnd.celastrinajs.config+json;Core"
-      },
+      "_content": {"type": "application/vnd.celastrinajs.config+json;Core"},
       "properties": {
         "cache": {
-          "_content": {"type": "application/vnd.celastrinajs.attribute+json;CachedPropertyManager"},
           "ttl": 5,
-          "utni": "minutes",
+          "unit": "minutes",
           "controls": [
             {
               "_content": {"type": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
               "key": "property-key-one",
-              "noCache": false,
-              "noExpire": false,
               "ttl": 2,
               "unit": "minutes"
             },
             {
               "_content": {"type": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
               "key": "property-key-two",
-              "noCache": true,
-              "ttl": 2,
-              "unit": "minutes"
+              "noCache": true
             },
             {
               "_content": {"type": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
               "key": "property-key-three",
-              "noExpire": true,
-              "ttl": 30,
-              "unit": "seconds"
+              "noExpire": true
             }
           ]
         }

@@ -197,7 +197,6 @@ describe("Configuration", () => {
             await _config.initialize(_azcontext);
             assert.deepStrictEqual(_config.properties, _pm);
             assert.deepStrictEqual(_config.resources, _rm);
-            assert.strictEqual(_config.loaded, false, "Should not be loaded yet.");
             assert.strictEqual(_pm.initialized, true, "PropertyManager Initialized.");
             assert.strictEqual(_pm.readied, true, "PropertyManager Readied.");
             assert.strictEqual(_rm.initialized, true, "AuthorizationManager Initialized.");
@@ -216,7 +215,6 @@ describe("Configuration", () => {
             delete process.env["IDENTITY_ENDPOINT"];
             delete process.env["IDENTITY_HEADER"];
             assert.deepStrictEqual(_config.resources, _rm);
-            assert.strictEqual(_config.loaded, false, "Should not be loaded yet.");
             assert.strictEqual(_config.properties instanceof AppConfigPropertyManager, true, "Expected AppConfigPropertyManager.")
             assert.strictEqual(_rm.initialized, true, "AuthorizationManager Initialized.");
             assert.strictEqual(_rm.readied, true, "AuthorizationManager Readied.");
@@ -227,7 +225,6 @@ describe("Configuration", () => {
             assert.strictEqual(_config.properties instanceof AppSettingsPropertyManager, true, "properties is AppSettingsPropertyManager.");
             assert.strictEqual(_config.resources instanceof ResourceManager, true, "authorizations is ResourceManager.");
             assert.strictEqual(_config.permissions instanceof PermissionManager, true, "authorizations is PermissionManager.");
-            assert.strictEqual(_config.loaded, false, "Should not be loaded yet.");
         });
         it("Should invoke configuration loader if present", async () => {
             let _config = new Configuration("mock_configuration");
@@ -243,7 +240,6 @@ describe("Configuration", () => {
             await _config.initialize(_azcontext);
             assert.strictEqual(_config.properties, _pm);
             assert.strictEqual(_config.resources, _rm);
-            assert.strictEqual(_config.loaded, false, "Should not be loaded yet.");
             assert.strictEqual(_pm.initialized, true, "PropertyManager Initialized.");
             assert.strictEqual(_pm.readied, true, "PropertyManager Readied.");
             assert.strictEqual(_rm.initialized, true, "AuthorizationManager Initialized.");
@@ -271,7 +267,6 @@ describe("Configuration", () => {
             _loader.setValue("celastrinajs.core.resource", new ResourceManager());
             _loader.setValue("celastrinajs.core.property.manager", _pm);
             await assert.doesNotReject(_loader.initialize(_azcontext));
-            await assert.doesNotReject(_loader.ready(_azcontext));
             assert.notStrictEqual(_loader.getValue(Configuration.CONFIG_RESOURCE), null, "ResourceManager null.");
             /**@type{ResourceManager}*/let _resources = _loader.getValue(Configuration.CONFIG_RESOURCE);
             let _rm1 = new AppRegistrationResource("mock-resource-1", "authority1", "tenant1", "secret1");
@@ -398,7 +393,6 @@ describe("Configuration", () => {
             let _addon = new MockAddOn();
             _config.addOn(_addon);
             await _config.initialize(_azcontext);
-            await _config.ready(_azcontext);
             assert.strictEqual(_addon.invokedGetConfigParser, true, "Expected to invoke initialize.");
             assert.strictEqual(_addon.invokedGetAttributeParser, true, "Expected to invoke initialize.");
             assert.strictEqual(_addon.invokedInitialize, true, "Expected to invoke initialize.");
