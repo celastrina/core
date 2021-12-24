@@ -1,9 +1,7 @@
 {
   "configurations": [
     {
-      "_content": {
-        "type": "application/vnd.celastrinajs.config+json;Core"
-      },
+      "_content": {"type": "application/vnd.celastrinajs.config+json;Core"},
       "properties": {
         "cache": {
           "_content": {"type": "application/vnd.celastrinajs.attribute+json;CachedPropertyManager"},

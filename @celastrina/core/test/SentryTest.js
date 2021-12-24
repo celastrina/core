@@ -56,7 +56,6 @@ describe("Sentry", () => {
             _config.setValue(Configuration.CONFIG_ROLE_FACTORY, _resolver);
             _config.setAuthorizationOptimistic(true);
             await _config.initialize(_azcontext);
-            await _config.ready(_azcontext);
             assert.strictEqual(_resolver.initialized, true, "Initialized RoleResolver.");
         });
     });
@@ -68,7 +67,6 @@ describe("Sentry", () => {
             _config.setAuthorizationOptimistic(true);
             _config.setValue(Configuration.CONFIG_ROLE_FACTORY, _resolver);
             await _config.initialize(_azcontext);
-            await _config.ready(_azcontext);
             let _context = new Context(_config);
             let _subject = await _config.sentry.authenticate(_context);
             assert.strictEqual(_subject instanceof Subject, true, "Instanceof BaseSubject.");
@@ -88,7 +86,6 @@ describe("Sentry", () => {
                 _config.setValue(Configuration.CONFIG_ROLE_FACTORY, _resolver);
                 _config.permissions.addPermission(_perm);
                 await _config.initialize(_azcontext);
-                await _config.ready(_azcontext);
                 _config.sentry._optimistic = true;
                 let _subject = await _config.sentry.authenticate(_context);
                 _config.sentry._optimistic = false;
@@ -105,7 +102,6 @@ describe("Sentry", () => {
                 let _context = new Context(_config);
                 _config.setValue(Configuration.CONFIG_ROLE_FACTORY, _resolver);
                 await _config.initialize(_azcontext);
-                await _config.ready(_azcontext);
                 let _subject = await _config.sentry.authenticate(_context);
                 await assert.doesNotReject(_config.sentry.authorize(_context));
             });
@@ -119,7 +115,6 @@ describe("Sentry", () => {
                 _config.setValue(Configuration.CONFIG_ROLE_FACTORY, _resolver);
                 _config.permissions.addPermission(_perm);
                 await _config.initialize(_azcontext);
-                await _config.ready(_azcontext);
                 let _subject = await _config.sentry.authenticate(_context);
                 await assert.doesNotReject(_config.sentry.authorize(_context));
             });

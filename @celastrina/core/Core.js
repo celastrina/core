@@ -31,8 +31,8 @@ const axios  = require("axios");
 const moment = require("moment");
 const { v4: uuidv4 } = require("uuid");
 const crypto = require("crypto");
-const {TokenResponse, AuthenticationContext} = require("adal-node");
-const {TokenCredentials, AccessToken, GetTokenOptions} = require("@azure/identity");
+const {AuthenticationContext} = require("adal-node");
+const {AccessToken} = require("@azure/identity");
 /**
  * @typedef _ManagedResourceToken
  * @property {string} access_token
@@ -1980,7 +1980,8 @@ class AddOnManager {
      */
     async install(azcontext, parse = false, cfp = null, atp = null) {
         if(this._target.length > 0 || this._unresolved.size > 0) {
-            azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-Ons, JSON configuration mode " + parse + ".");
+            azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On's, JSON configuration mode " +
+                               parse + ".");
             let _pass = 0;
             while(_pass < this._depth) {
                 for(let _addon of this._unresolved.values()) {
@@ -2002,7 +2003,8 @@ class AddOnManager {
             }
             else {
                 for(let _addon of this._target) {
-                    azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On '" + _addon.constructor.addOnName + "'.");
+                    azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Initializing Add-On " +
+                        _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
                     if(parse) {
                         let _acfp = _addon.getConfigParser();
                         if(_acfp != null) cfp.addLink(_acfp);
@@ -2021,6 +2023,7 @@ class AddOnManager {
                         }
                     }
                 }
+                azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Add-On's installed successfully.");
             }
         }
     }
@@ -2030,22 +2033,27 @@ class AddOnManager {
      */
     async initialize(azcontext, config) {
         if(this._target.length > 0) {
-            azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Initializing Add-Ons.");
+            azcontext.log.info("[AddOnManager.initialize(azcontext, parse, cfp, atp)]: Initializing Add-On's.");
             let _promises = [];
-            for(let _addon of this._target) {
-                azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On '" + _addon.constructor.addOnName + "'.");
+            for(/**@type{AddOn}*/let _addon of this._target) {
+                azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On " +
+                    _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
                 _promises.push(_addon.initialize(azcontext, config));
             }
             await Promise.all(_promises);
-            // Clean up all the un-needed data.
-            delete this._target;
+            azcontext.log.info("[AddOnManager.initialize(azcontext, parse, cfp, atp)]: Add-On initialization successful.");
         }
     }
-    async ready() {
+    /**
+     * @param {Object} azcontext
+     * @return {Promise<void>}
+     */
+    async ready(azcontext) {
         this._ready = true;
         delete this._target;
         this._unresolved.clear();
         delete this._unresolved;
+        azcontext.log.info("[AddOnManager.ready(azcontext)]: Add-On's ready.");
     }
 }
 /**
@@ -2471,7 +2479,7 @@ class Configuration {
     async initialize(azcontext) {
         this._config[Configuration.CONFIG_CONTEXT] = azcontext;
         if(!this._loaded) {
-            azcontext.log.info("[" + azcontext.bindingData.invocationId + "][Configuration.initialize(azcontext)]: Initializing Celastrina.");
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Initializing Celastrina by request " + azcontext.bindingData.invocationId + ".");
             let _name = this._config[Configuration.CONFIG_NAME];
             if(typeof _name !== "string" || _name.trim().length === 0 || _name.indexOf(" ") >= 0) {
                 azcontext.log.error("[Configuration.load(azcontext)]: Invalid Configuration. Name cannot be undefined, null, or empty.");
@@ -2481,7 +2489,6 @@ class Configuration {
             /**@type{PropertyManager}*/let _pm = this._getPropertyManager(azcontext);
             /**@type{PermissionManager}*/let _prm = this._getPermissionManager(azcontext);
             /**@type{ResourceManager}*/let _rm = this._getResourceManager(azcontext);
-
             await _pm.initialize(azcontext, this._config);
             await this._initPropertyLoader();
             await this._installAddOns(azcontext);
@@ -2492,22 +2499,22 @@ class Configuration {
             await _prm.ready(azcontext, this._config);
             await _rm.ready(azcontext, this._config);
             await this._initRoleFactory();
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Initialization Sentry.");
             await this._initSentry();
             await this._initAddOns(azcontext);
             await this.afterInitialize(azcontext, _pm, _rm);
-            azcontext.log.info("[" + azcontext.bindingData.invocationId + "][Configuration.initialize(azcontext)]: Initialization successful.");
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Initialization successful.");
+            this._loaded = true;
+            await this._addons.ready(azcontext);
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Celastrina ready.");
         }
     }
-    /**
-     * @return{Promise<void>}
-     */
-    async ready(azcontext) {
-        this._loaded = true;
-        await this._addons.ready();
-        azcontext.log.info("[" + azcontext.bindingData.invocationId + "][Configuration.initialize(azcontext)]: Celastrina ready.");
-    }
 }
-/**@abstract*/
+/**
+ * Algorithm
+ * @author Robert R Murrell
+ * @abstract
+ */
 class Algorithm {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Algorithm";}
     /**
@@ -3447,7 +3454,6 @@ class BaseFunction extends CelastrinaFunction {
         }
         await _context.initialize();
         this._context = _context;
-        await this._configuration.ready(azcontext);
     }
     /**
      * @param {Context} context

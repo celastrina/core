@@ -92,7 +92,6 @@ describe("ResourceManager", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 let _config = new Configuration("ResourceManagerTest");
                 await _config.initialize(_azcontext);
-                await _config.ready(_azcontext);
                 let _rm = _config.resources;
                 let _auth = await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
                 assert.strictEqual(_auth != null, true, "Expected not null.");
@@ -102,7 +101,6 @@ describe("ResourceManager", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 let _config = new Configuration("ResourceManagerTest");
                 await _config.initialize(_azcontext);
-                await _config.ready(_azcontext);
                 let _rm = _config.resources;
                 let _auth = await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
                 assert.strictEqual(_auth == null, true, "Expected null.");

@@ -203,7 +203,6 @@ describe("BaseContext", () => {
                 _pm.mockProperty("mock_string_key", "value_1");
                 _config.setValue(Configuration.CONFIG_PROPERTY, _pm);
                 await _config.initialize(_azcontext);
-                await _config.ready(_azcontext);
                 let _context = new Context(_config);
                 await _context.initialize();
                 assert.strictEqual(await _context.getProperty("mock_string_key"), "value_1", "Expected 'value_1'.");
