@@ -61,7 +61,7 @@ const {AccessToken} = require("@azure/identity");
 /**
  * @type {string}
  */
-const CELATRINA_DEFAULT_TIMEOUT = "celastrinajs.core.deault.timeout";
+const CELATRINA_DEFAULT_TIMEOUT = "celastrinajs.core.service.timeout.default";
 /**
  * @type {number}
  */
@@ -92,8 +92,9 @@ function instanceOfCelastrinaType(_class, _object) {
     return false;
 }
 /**
- * Returns the default timeout set up for celatrina. If non is set in the Configuration of the azure function then
- * _default_ is returned.
+ * @description Returns the default timeout set up for celatrina.<br/>
+ *              If none is specified in the Function Configuration then option argument <code>_default_</code>, which defaults
+ *              to <code>DEFAULT_TIMEOUT</code> milliseconds.
  * @param {number} [_default_=DEFAULT_TIMEOUT]
  * @return {number}
  */
@@ -1016,7 +1017,11 @@ class CacheProperty {
     /**@return{number}*/get time() {return this._time;}
     /**@param{number}unit*/set time(unit) {
         if(this._cache) {
-            if(this._time > 0) this._expires = moment().add(this._time, this._unit);
+            if(unit > 0) {
+                this._time = unit;
+                this._expires = moment().add(this._time, this._unit);
+            }
+            else this._time = 0;
         }
         else this._time = 0;
     }
@@ -1764,7 +1769,7 @@ class CachePropertyParser extends AttributeParser {
             if(_CacheProperty.hasOwnProperty("ttl") && typeof _CacheProperty.ttl === "number")
                 _cache.cache.time = _CacheProperty.ttl;
             if(_CacheProperty.hasOwnProperty("unit") && typeof _CacheProperty.unit === "string" &&
-                    _CacheProperty.unit.trim().length === 0)
+                    _CacheProperty.unit.trim().length > 0)
                 _cache.cache.unit = /**@type{moment.DurationInputArg2}*/_CacheProperty.unit.trim();
         }
         return _cache;
@@ -2160,10 +2165,11 @@ class AddOnManager {
      */
     async ready(azcontext) {
         this._ready = true;
+        let _ready = this._target.length > 0;
         delete this._target;
         this._unresolved.clear();
         delete this._unresolved;
-        azcontext.log.info("[AddOnManager.ready(azcontext)]: Add-On's ready.");
+        if(_ready) azcontext.log.info("[AddOnManager.ready(azcontext)]: Add-On's ready.");
     }
 }
 /**
@@ -2405,8 +2411,10 @@ class Configuration {
      * @return {Promise<void>}
      */
     async _load(azcontext) {
+        azcontext.log.info("[Configuration._load(azcontext)]: Loading Celastrina from JSON configuration '" + this._property + "'.");
         this._atp.initialize(azcontext, this._config, this._addons);
         this._cfp.initialize(azcontext, this._config, this._addons);
+        azcontext.log.info("[Configuration._load(azcontext)]: Config and Attribute parsers initialized.");
         let _pm = this._config[Configuration.CONFIG_PROPERTY];
         /**@type{(null|undefined|Object)}*/let _funcconfig = await _pm.getObject(this._property);
         if (_funcconfig == null)
@@ -2426,6 +2434,7 @@ class Configuration {
         await Promise.all(_promises);
         delete this._atp;
         delete this._cfp;
+        azcontext.log.info("[Configuration._load(azcontext)]: Loaded from JSON configuration successfully.");
     }
     /**
      * @param {_AzureFunctionContext} azcontext
@@ -2590,16 +2599,17 @@ class Configuration {
     async initialize(azcontext) {
         this._config[Configuration.CONFIG_CONTEXT] = azcontext;
         if(!this._loaded) {
-            azcontext.log.info("[Configuration.initialize(azcontext)]: Initializing Celastrina by request " + azcontext.bindingData.invocationId + ".");
+            azcontext.log.info("[STARTING][Configuration.initialize(azcontext)]: Initializing Celastrina by request " + azcontext.bindingData.invocationId + ".");
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Default global service timeout set to " + getDefaultTimeout() + ".");
             let _name = this._config[Configuration.CONFIG_NAME];
             if(typeof _name !== "string" || _name.trim().length === 0 || _name.indexOf(" ") >= 0) {
-                azcontext.log.error("[Configuration.load(azcontext)]: Invalid Configuration. Name cannot be undefined, null, or empty.");
+                azcontext.log.error("[FATAL][Configuration.load(azcontext)]: Invalid Configuration. Name cannot be undefined, null, or empty.");
                 throw CelastrinaValidationError.newValidationError("Name cannot be undefined, null, or 0 length.", Configuration.CONFIG_NAME);
             }
             await this.beforeInitialize(azcontext);
-            /**@type{PropertyManager}*/let _pm = this._getPropertyManager(azcontext);
-            /**@type{PermissionManager}*/let _prm = this._getPermissionManager(azcontext);
-            /**@type{ResourceManager}*/let _rm = this._getResourceManager(azcontext);
+            /**@type{PropertyManager}*/let _pm = this._getPropertyManager(azcontext); // Smart-load PropertyManager
+            /**@type{PermissionManager}*/let _prm = this._getPermissionManager(azcontext); // Smart-load PermissionManager
+            /**@type{ResourceManager}*/let _rm = this._getResourceManager(azcontext); // Smart-load ResourceManager
             await _pm.initialize(azcontext, this._config);
             await this._initPropertyLoader();
             await this._installAddOns(azcontext);
@@ -2611,14 +2621,14 @@ class Configuration {
             await _prm.ready(azcontext, this._config);
             await _rm.ready(azcontext, this._config);
             await this._initRoleFactory();
-            azcontext.log.info("[Configuration.initialize(azcontext)]: Initialization Sentry.");
             await this._initSentry();
+            azcontext.log.info("[Configuration.initialize(azcontext)]: Sentry initialized.");
             await this._initAddOns(azcontext);
             await this.afterInitialize(azcontext, _pm, _rm);
             azcontext.log.info("[Configuration.initialize(azcontext)]: Initialization successful.");
             this._loaded = true;
             await this._addons.ready(azcontext);
-            azcontext.log.info("[Configuration.initialize(azcontext)]: Celastrina ready.");
+            azcontext.log.info("[READY][Configuration.initialize(azcontext)]: Celastrina ready. May the force live long and prosper!");
         }
     }
 }
@@ -3561,7 +3571,7 @@ class BaseFunction extends CelastrinaFunction {
         await this._configuration.initialize(azcontext);
         /**@type{Context}*/let _context = await this.createContext(this._configuration);
         if(typeof _context === "undefined" || _context == null) {
-            azcontext.log.error("[" + azcontext.bindingData.invocationId + "][BaseFunction.bootstrap(azcontext)]: Catostrophic Error! Context is null or undefined.");
+            azcontext.log.error("[" + azcontext.bindingData.invocationId + "][FATAL][BaseFunction.bootstrap(azcontext)]: Catostrophic Error! Context is null or undefined.");
             throw CelastrinaError.newError("Catostrophic Error! Context invalid.");
         }
         await _context.initialize();
@@ -3593,20 +3603,24 @@ class BaseFunction extends CelastrinaFunction {
         return this.initialize(context);
     }
     /**
+     * @description If you want an add-on to change authentication behavior you must do it through the Sentry at
+     *              initialization time.
      * @param {Context} context
-     * @return {Promise<Subject>}
+     * @return {Promise<void>}
      */
     async _authenticate(context) {
+        context.subject = await this.authenticate(context); // Do authentication first so Add-On's can circumvent it.
         await context.config.addOns.doLifeCycle(LifeCycle.STATE.AUTHENTICATE, this, context);
-        return this.authenticate(context);
     }
     /**
+     * @description If you want an add-on to change authorization behavior you must do it through the Sentry at
+     *              initialization time.
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _authorize(context) {
+        await this.authorize(context); // Do authorization first so Add-On's can circumvent it.
         await context.config.addOns.doLifeCycle(LifeCycle.STATE.AUTHORIZE, this, context);
-        return this.authorize(context);
     }
     /**
      * @param {Context} context
@@ -3674,7 +3688,7 @@ class BaseFunction extends CelastrinaFunction {
             await this.bootstrap(azcontext);
             if((typeof this._context !== "undefined") && this._context != null) {
                 await this._initialize(this._context);
-                this._context.subject = await this._authenticate(this._context);
+                await this._authenticate(this._context);
                 await this._authorize(this._context);
                 await this._validate(this._context);
                 await this._load(this._context);
@@ -3697,14 +3711,14 @@ class BaseFunction extends CelastrinaFunction {
                 else {
                     let _ex = this._unhandled(azcontext, exception);
                     azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                        "][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null, skipping exception life-cycle: " +
+                        "][FATAL][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null, skipping exception life-cycle: " +
                         _ex);
                 }
             }
             catch(_exception) {
                 let _ex = this._unhandled(azcontext, _exception);
                 azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                    "][BaseFunction.execute(azcontext)]: Exception thrown from Exception life-cycle: " +
+                    "][FATAL][BaseFunction.execute(azcontext)]: Exception thrown from Exception life-cycle: " +
                                   _ex  + ", caused by " + exception + ". ");
             }
         }
@@ -3719,14 +3733,14 @@ class BaseFunction extends CelastrinaFunction {
                 }
                 else {
                     azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                        "][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null, skipping terminate life-cycle.");
+                        "][FATAL][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null, skipping terminate life-cycle.");
                     throw CelastrinaError.newError("Catostrophic Error! Context null.");
                 }
             }
             catch(exception) {
                 let _ex = this._unhandled(azcontext, exception);
                 azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                                    "][BaseFunction.execute(azcontext)]: Exception thrown from Terminate life-cycle: " +
+                                    "][UNHANDLED][BaseFunction.execute(azcontext)]: Exception thrown from Terminate life-cycle: " +
                                     _ex);
                 azcontext.res.status = _ex.code;
                 azcontext.done(_ex);
