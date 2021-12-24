@@ -21,9 +21,91 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-const {CelastrinaError, LOG_LEVEL, CachePropertyParser} = require("../Core");
-const moment = require("moment");
+const {instanceOfCelastrinaType,CacheProperty, CachePropertyParser} = require("../Core");
+const assert = require("assert");
 
 describe("CachePropertyParser", () => {
-	//
+	describe("#_create(_CacheProperty)", () => {
+		it("should create using ttl and unit.", async () => {
+			let _CacheProperty = {_content: {type: "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+									key: "property-key-one",
+									ttl: 2,
+									unit: "seconds"};
+			let _parser = new CachePropertyParser();
+			let _cache = await _parser._create(_CacheProperty);
+			assert.strictEqual(_cache != null, true, "Expected no null.");
+			assert.strictEqual(typeof _cache !== "undefined", true, "Expected not undefined.");
+			assert.strictEqual(_cache.key, "property-key-one", "Expected 'property-key-one'.");
+			assert.strictEqual(instanceOfCelastrinaType(CacheProperty, _cache.cache), true, "Expected 'property-key-one'.");
+			assert.strictEqual(_cache.cache.time, 2, "Expected 2.");
+			assert.strictEqual(_cache.cache.unit, "seconds", "Expected 'seconds'.");
+		});
+		it("should create using ttl.", async () => {
+			let _CacheProperty = {_content: {type: "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+				key: "property-key-one",
+				ttl: 2};
+			let _parser = new CachePropertyParser();
+			let _cache = await _parser._create(_CacheProperty);
+			assert.strictEqual(_cache != null, true, "Expected no null.");
+			assert.strictEqual(typeof _cache !== "undefined", true, "Expected not undefined.");
+			assert.strictEqual(_cache.key, "property-key-one", "Expected 'property-key-one'.");
+			assert.strictEqual(instanceOfCelastrinaType(CacheProperty, _cache.cache), true, "Expected 'property-key-one'.");
+			assert.strictEqual(_cache.cache.time, 2, "Expected 2.");
+			assert.strictEqual(_cache.cache.unit, "minutes", "Expected 'minutes'.");
+		});
+		it("should create using unit.", async () => {
+			let _CacheProperty = {_content: {type: "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+				key: "property-key-one",
+				unit: "seconds"};
+			let _parser = new CachePropertyParser();
+			let _cache = await _parser._create(_CacheProperty);
+			assert.strictEqual(_cache != null, true, "Expected no null.");
+			assert.strictEqual(typeof _cache !== "undefined", true, "Expected not undefined.");
+			assert.strictEqual(_cache.key, "property-key-one", "Expected 'property-key-one'.");
+			assert.strictEqual(instanceOfCelastrinaType(CacheProperty, _cache.cache), true, "Expected 'property-key-one'.");
+			assert.strictEqual(_cache.cache.time, 5, "Expected 2.");
+			assert.strictEqual(_cache.cache.unit, "seconds", "Expected 'seconds'.");
+		});
+		it("should create noCache.", async () => {
+			let _CacheProperty = {_content: {type: "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+				key: "property-key-one",
+				noCache: true};
+			let _parser = new CachePropertyParser();
+			let _cache = await _parser._create(_CacheProperty);
+			assert.strictEqual(_cache != null, true, "Expected no null.");
+			assert.strictEqual(typeof _cache !== "undefined", true, "Expected not undefined.");
+			assert.strictEqual(_cache.key, "property-key-one", "Expected 'property-key-one'.");
+			assert.strictEqual(instanceOfCelastrinaType(CacheProperty, _cache.cache), true, "Expected 'property-key-one'.");
+			assert.strictEqual(_cache.cache.cache, false, "Expected false.");
+			assert.strictEqual(_cache.cache.lastUpdated, null, "Expected null.");
+		});
+		it("should create noExpire.", async () => {
+			let _CacheProperty = {_content: {type: "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+				key: "property-key-one",
+				noExpire: true};
+			let _parser = new CachePropertyParser();
+			let _cache = await _parser._create(_CacheProperty);
+			assert.strictEqual(_cache != null, true, "Expected no null.");
+			assert.strictEqual(typeof _cache !== "undefined", true, "Expected not undefined.");
+			assert.strictEqual(_cache.key, "property-key-one", "Expected 'property-key-one'.");
+			assert.strictEqual(instanceOfCelastrinaType(CacheProperty, _cache.cache), true, "Expected 'property-key-one'.");
+			assert.strictEqual(_cache.cache.cache, true, "Expected false.");
+			assert.strictEqual(_cache.cache.lastUpdated, null, "Expected null.");
+			assert.strictEqual(_cache.cache.time, 0, "Expected 0.");
+		});
+		it("should prioritize noCache over noExpire.", async () => {
+			let _CacheProperty = {_content: {type: "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+				key: "property-key-one",
+				noExpire: true,
+				noCache: true};
+			let _parser = new CachePropertyParser();
+			let _cache = await _parser._create(_CacheProperty);
+			assert.strictEqual(_cache != null, true, "Expected no null.");
+			assert.strictEqual(typeof _cache !== "undefined", true, "Expected not undefined.");
+			assert.strictEqual(_cache.key, "property-key-one", "Expected 'property-key-one'.");
+			assert.strictEqual(instanceOfCelastrinaType(CacheProperty, _cache.cache), true, "Expected 'property-key-one'.");
+			assert.strictEqual(_cache.cache.cache, false, "Expected false.");
+			assert.strictEqual(_cache.cache.lastUpdated, null, "Expected null.");
+		});
+	});
 });
