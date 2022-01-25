@@ -29,7 +29,7 @@
 "use strict";
 const axios  = require("axios");
 const moment = require("moment");
-const { v4: uuidv4 } = require("uuid");
+const {v4: uuidv4} = require("uuid");
 const crypto = require("crypto");
 const {AuthenticationContext} = require("adal-node");
 const {AccessToken} = require("@azure/identity");
@@ -93,8 +93,8 @@ function instanceOfCelastrinaType(_class, _object) {
 }
 /**
  * @description Returns the default timeout set up for celatrina.<br/>
- *              If none is specified in the Function Configuration then option argument <code>_default_</code>, which defaults
- *              to <code>DEFAULT_TIMEOUT</code> milliseconds.
+ *              If none is specified in the Function Configuration then option argument <code>_default_</code>, which
+ *     defaults to <code>DEFAULT_TIMEOUT</code> milliseconds.
  * @param {number} [_default_=DEFAULT_TIMEOUT]
  * @return {number}
  */
@@ -518,9 +518,16 @@ class ResourceManager {
     /**@param{number}timeout*/set defaultTimeout(timeout) {this._defaultTimeout = getDefaultTimeout(timeout);}
     /**
      * @param {ResourceAuthorization} auth
-     * @return {ResourceManager}
+     * @return {Promise<ResourceManager>}
      */
     async addResource(auth) {
+        return this.addResourceSync(auth);
+    }
+    /**
+     * @param {ResourceAuthorization} auth
+     * @return {ResourceManager}
+     */
+    addResourceSync(auth) {
         auth.timeout = this._defaultTimeout;
         this._resources[auth.id] = auth;
         return this;
@@ -785,19 +792,123 @@ class PropertyManager {
 /**
  * AppSettingsPropertyManager
  * @author Robert R Murrell
+ * @property {number} _timeout
+ * @property {boolean} _followVaultReference
+ * @property {Vault} [_authVault = null]
+ * @property {(null|string)} [_vaultResource=null]
  */
 class AppSettingsPropertyManager extends PropertyManager {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManager";}
-    constructor() {
+    /**
+     * @param {boolean} [followVaultReference=true]
+     * @param {string} [vaultResource=ManagedIdentityResource.MANAGED_IDENTITY]
+     * @param {number} [timeout=DEFAULT_TIMEOUT]
+     */
+    constructor(followVaultReference = false, vaultResource = ManagedIdentityResource.MANAGED_IDENTITY,
+                timeout = DEFAULT_TIMEOUT) {
         super();
+        this._timeout = getDefaultTimeout(timeout);
+        /** @type{boolean}*/this._followVaultReference = followVaultReference;
+        if(this._followVaultReference) {
+            if(typeof vaultResource !== "string" || vaultResource.trim().length === 0)
+                throw CelastrinaValidationError.newValidationError("Arguemtn 'vaultResource' is required.", "vaultResource");
+            this._authVault = null;
+            this._vault = new Vault(this._timeout);
+            this._vaultResource = vaultResource;
+        }
+        else {
+            this._authVault = null;
+            this._vault = null;
+            this._vaultResource = null;
+        }
     }
     /**@return{string}*/get name() {return "AppSettingsPropertyManager";}
+    /**@return{Vault}*/get vault() {return this._vault;}
+    /**@return{boolean}*/get followVaultReferences() {return this._followVaultReference;}
+    /**@param{boolean}follow*/set followVaultReferences(follow) {
+        this._followVaultReference = follow;
+        if(this._followVaultReference) {
+            this._authVault = null;
+            this._vault = new Vault(this._timeout);
+        }
+        else {
+            this._authVault = null;
+            this._vault = null;
+        }
+    }
+    /**@return{number}*/get timeout() {return this._timeout;}
+    /**@param{number}timeout*/set timeout(timeout) {this._timeout = getDefaultTimeout(timeout);}
+    /**@return{string}*/get vaultResource() {return this._vaultResource;}
+    /**@param{string}resource*/set vaultResource(resource) {
+        if(typeof resource !== "string" || resource.trim().length === 0)
+            throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
+        this._vaultResource = resource;
+    }
+    /**
+     * @param azcontext
+     * @param config
+     * @return {Promise<void>}
+     */
+    async initialize(azcontext, config) {
+        if(this._followVaultReference) {
+            if(this._vaultResource === ManagedIdentityResource.MANAGED_IDENTITY) {
+                if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
+                    throw CelastrinaError.newError(
+                        "AppSettingsPropertyManager requires User or System Assigned Managed Identies to be enabled when following vault references.");
+            }
+            /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
+            this._authVault = await _rm.getResource(this._vaultResource);
+            if(!instanceOfCelastrinaType(ResourceAuthorization, this._authVault))
+                throw CelastrinaError.newError(
+                    "Vault resource authorization '" + this._vaultResource + "' not found. AppSettingsPropertyManager initialization failed.");
+        }
+    }
+    /**
+     * @param {{content_type?:string}} object
+     * @return {boolean}
+     */
+    isVaultReference(object) {
+        if(object.hasOwnProperty("content_type") && typeof object.content_type === "string" &&
+                object.content_type.trim().length > 0)
+            return (object.content_type.trim().toLowerCase() === "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8");
+        else return false;
+    }
+    /**
+     * @param {{content_type?:string,value?:string}} object
+     * @return {Promise<*>}
+     */
+    async resolveVaultReference(object) {
+        try {
+            /**@type{{uri?:string}}*/let _vlt = JSON.parse(object.value);
+            return await this._vault.getSecret(await this._authVault.getToken("https://vault.azure.net"), _vlt.uri);
+        }
+        catch(exception) {
+            throw CelastrinaError.wrapError(exception);
+        }
+    }
     /**
      * @param {string} key
      * @return {Promise<*>}
+     * @private
      */
     async _getProperty(key) {
-        return process.env[key];
+        let _value = process.env[key];
+        if(this._followVaultReference) {
+            if(typeof _value === "string" && _value.trim().length > 0) {
+                let _obj = _value.trim();
+                if(_obj.startsWith("{") && _obj.endsWith("}") && _obj.indexOf("content_type") > 0) {
+                    try {
+                        _obj = JSON.parse(_obj);
+                        if(this.isVaultReference(_obj)) _value = await this.resolveVaultReference(_obj);
+                    }
+                    catch(exception) {
+                        if(instanceOfCelastrinaType(CelastrinaError, exception) && exception.code === 404) return null;
+                        else throw CelastrinaError.wrapError(exception);
+                    }
+                }
+            }
+        }
+        return _value;
     }
 }
 /**
@@ -811,80 +922,58 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      * @param {string} [propResource = ManagedIdentityResource.MANAGED_IDENTITY]
      * @param {string} [vaultResource = ManagedIdentityResource.MANAGED_IDENTITY]
      * @param {string} [label="development"]
-     * @param {boolean} [useVaultSecrets=true]
+     * @param {boolean} [followVaultReference=true]
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
-    constructor(configStoreName, propResource = ManagedIdentityResource.MANAGED_IDENTITY,
-                vaultResource = ManagedIdentityResource.MANAGED_IDENTITY, label = "development",
-                useVaultSecrets = true, timeout = DEFAULT_TIMEOUT) {
-        super();
-        this._configStore = "https://" + configStoreName + ".azconfig.io";
-        this._endpoint = this._configStore + "/kv/{key}";
-        this._timeout = getDefaultTimeout(timeout);
+    constructor(configStoreName, label = "development", propResource = ManagedIdentityResource.MANAGED_IDENTITY,
+                timeout = DEFAULT_TIMEOUT, followVaultReference = true, vaultResource = ManagedIdentityResource.MANAGED_IDENTITY) {
+        super(followVaultReference, vaultResource, timeout);
+        if(typeof configStoreName !== "string" || configStoreName.trim().length === 0)
+            throw CelastrinaValidationError.newValidationError("Arguemtn 'configStoreName' is required.", "configStoreName");
         if(typeof propResource !== "string" || propResource.trim().length === 0)
             throw CelastrinaValidationError.newValidationError("Arguemtn 'propResource' is required.", "propResource");
-        if(typeof vaultResource !== "string" || vaultResource.trim().length === 0)
-            throw CelastrinaValidationError.newValidationError("Arguemtn 'vaultResource' is required.", "vaultResource");
+        this._configStore = "https://" + configStoreName + ".azconfig.io";
+        this._endpoint = this._configStore + "/kv/{key}";
         this._propResource = propResource.trim();
-        this._vaultResource = vaultResource.trim();
         this._params = new URLSearchParams();
         this._params.set("label", label);
         this._params.set("api-version", "1.0");
         /** @type {ResourceAuthorization} */this._authProp = null;
-        /** @type {ResourceAuthorization} */this._authVault = null;
-        /** @type{boolean} */this._useVaultSecrets = useVaultSecrets;
-        if(this._useVaultSecrets)
-            /** @type{Vault} */this._vault = new Vault(this._timeout);
     }
     /**@return{string}*/get name() {return "AppConfigPropertyManager";}
     /**@return{string}*/get configStore() {return this._configStore;}
-    /**@return{number}*/get timeout() {return this._timeout;}
-    /**@param{number}timeout*/set timeout(timeout) {this._timeout = getDefaultTimeout(timeout);}
-    /**@return{boolean}*/get useVault() {return this._useVaultSecrets;}
-    /**@param{boolean}useVault*/set useVault(useVault) {this._useVaultSecrets = useVault;}
     /**@return{string}*/get propertyResource() {return this._propResource;}
-    /**@return{string}*/get label() {return this._params.get("label");}
-    /**@return{string}*/get apiVersion() {return this._params.get("api-version");}
-    /**@return{Vault}*/get vault() {return this._vault;}
-    /**@param{string}label*/set label(label) {
-        if(typeof label !== "string" || label.trim().length === 0) this._params.set("label", "development");
-        else this._params.set("label", label.trim());
-    }
     /**@param{string}resource*/set propertyResource(resource) {
         if(typeof resource !== "string" || resource.trim().length === 0)
             throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
         this._propResource = resource.trim();
     }
-    /**@return{string}*/get vaultResource() {return this._vaultResource;}
-    /**@param{string}resource*/set vaultResource(resource) {
-        if(typeof resource !== "string" || resource.trim().length === 0)
-            throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
-        this._vaultResource = resource.trim();
+    /**@return{string}*/get label() {return this._params.get("label");}
+    /**@param{string}label*/set label(label) {
+        if(typeof label !== "string" || label.trim().length === 0) this._params.set("label", "development");
+        else this._params.set("label", label.trim());
     }
+    /**@return{string}*/get apiVersion() {return this._params.get("api-version");}
     /**
      * @param {_AzureFunctionContext} azcontext
      * @param {Object} config
      * @return {Promise<void>}
      */
     async initialize(azcontext, config) {
-        if(this._propResource === ManagedIdentityResource.MANAGED_IDENTITY) {
-            if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
-                throw CelastrinaError.newError(
-                    "AppConfigPropertyManager requires User or System Assigned Managed Identies to be enabled.");
-        }
-        /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
-        this._authProp = await _rm.getResource(this._propResource);
-        if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
-            throw CelastrinaError.newError(
-                "Property resource authorization '" + this._propResource + "' not found. AppConfigPropertyManager initialization failed.");
-        if(this._useVaultSecrets) {
-            if(this._vaultResource === this._propResource) this._authVault = this._authProp;
-            else {
-                this._authVault = await _rm.getResource(this._vaultResource);
-                if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
+        await super.initialize(azcontext, config);
+        if(this._authVault != null && (this._vaultResource === this._propResource))
+            this._authProp = this._authVault;
+        else {
+            if(this._propResource === ManagedIdentityResource.MANAGED_IDENTITY) {
+                if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
                     throw CelastrinaError.newError(
-                        "Vault resource authorization '" + this._vaultResource + "' not found. AppConfigPropertyManager initialization failed.");
+                        "AppConfigPropertyManager requires User Assigned or System Managed Identies to be enabled.");
             }
+            /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
+            this._authProp = await _rm.getResource(this._propResource);
+            if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
+                throw CelastrinaError.newError(
+                    "Property resource authorization '" + this._propResource + "' not found. AppConfigPropertyManager initialization failed.");
         }
     }
     /**
@@ -894,45 +983,28 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      */
     async ready(azcontext, config) {}
     /**
-     * @param _config
-     * @return {Promise<*>}
-     * @private
-     */
-    async _resolveVaultReference(_config) {
-        /**@type{{uri?:string}}*/let _vlt = JSON.parse(_config.value);
-        return await this._vault.getSecret(await this._authVault.getToken("https://vault.azure.net"), _vlt.uri);
-    }
-    /**
-     * @param {{content_type?:string}} kvp
-     * @return {boolean}
-     * @private
-     */
-    _isVaultReference(kvp) {
-        return (kvp.content_type === "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8" &&
-                this._useVaultSecrets);
-    }
-    /**
      * @param {{value?:string}} kvp
-     * @return {Promise<*>}
-     * @private
+     * @return {Promise<string>}
      */
-    async _resolveFeatureFlag(kvp) {
-        return kvp.value;
+    async resolveFeatureFlag(kvp) {
+            return kvp.value;
     }
     /**
      * @param {{content_type?:string}} kvp
      * @return {boolean}
-     * @private
      */
-    _isFeatureFlag(kvp) {
-        return kvp.content_type === "application/vnd.microsoft.appconfig.ff+json;charset=utf-8";
+    isFeatureFlag(kvp) {
+        if(kvp.hasOwnProperty("content_type") && typeof kvp.content_type === "string" &&
+                kvp.content_type.trim().length > 0)
+            return (kvp.content_type.trim().toLowerCase() === "application/vnd.microsoft.appconfig.ff+json;charset=utf-8");
+        else return false;
     }
     /**
      * @param {string} key
      * @return {Promise<*>}
      * @private
      */
-    async _getAppConfigProperty(key) {
+    async _getProperty(key) {
         try {
             let token = await this._authProp.getToken(this._configStore);
             let _endpoint = this._endpoint.replace("{key}", key);
@@ -940,41 +1012,26 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
                                            {params: this._params,
                                                   headers: {"Authorization": "Bearer " + token,
                                                   timeout: this._timeout}});
-            let _value = response.data;
-            if(this._isVaultReference(_value))
-                return await this._resolveVaultReference(_value);
-            else if(this._isFeatureFlag(_value))
-                return await this._resolveFeatureFlag(_value);
+            /**@type{{content_type:string,value:string}}*/let _config = response.data;
+            if(this._followVaultReference && this.isVaultReference(_config))
+                return await this.resolveVaultReference(_config);
+            else if(this.isFeatureFlag(_config))
+                return await this.resolveFeatureFlag(_config);
             else
-                return _value.value;
+                return _config.value;
         }
         catch(exception) {
             if(instanceOfCelastrinaType(CelastrinaError, exception))
                 throw exception;
             else if(typeof exception === "object" && exception.hasOwnProperty("response")) {
                 if(exception.response.status === 404)
-                    throw CelastrinaError.newError("App Configuration '" + key + "' not found.", 404);
+                    return await super._getProperty(key); // Attempt to get an override locally.
                 else
                     throw CelastrinaError.newError("Exception getting App Configuration '" + key + "': " +
                                                            exception.response.statusText, exception.response.status);
             }
             else
                 throw CelastrinaError.newError("Exception getting App Configuration '" + key + "'.");
-        }
-    }
-    /**
-     * @param {string} key
-     * @return {Promise<*>}
-     */
-    async _getProperty(key) {
-        try {
-            return await this._getAppConfigProperty(key);
-        }
-        catch(exception) {
-            if(exception.code === 404)
-                return await super._getProperty(key);
-            else
-                throw exception;
         }
     }
 }
@@ -1335,6 +1392,35 @@ class PropertyManagerFactory {
     }
 }
 /**
+ * AppSettingsPropertyManagerFactory
+ * @author Robert R Murrell
+ */
+class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
+    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManagerFactory";}
+    static PROP_USE_APP_SETTINGS = "celastrinajs.core.property.appsettings.config";
+    constructor(name = AppSettingsPropertyManagerFactory.PROP_USE_APP_SETTINGS) {
+        super(name);
+    }
+    /**@return{string}*/getName() {return "AppSettingsPropertyManagerFactory";}
+    /**
+     * @param {{store:string, label?:(null|string), useVault?:(null|boolean),
+     *          timeout?:(null|number), propertyResource?:(null|string), vaultResource?(null|string)}} source
+     * @return {PropertyManager}
+     */
+    _createPropertyManager(source) {
+        let _useVault = false;
+        let _timeout = getDefaultTimeout(DEFAULT_TIMEOUT);
+        let _vaultRes = ManagedIdentityResource.MANAGED_IDENTITY;
+        if(source.hasOwnProperty("useVault") && typeof source.useVault === "boolean")
+            _useVault = source.useVault;
+        if(source.hasOwnProperty("timeout") && typeof source.timeout === "number")
+            _timeout = getDefaultTimeout(source.timeout);
+        if(source.hasOwnProperty("vaultResource") && typeof source.label === "string" && source.label.trim().length > 0)
+            _vaultRes = source.vaultResource;
+        return new AppSettingsPropertyManager(_useVault, _vaultRes, _timeout);
+    }
+}
+/**
  * AppConfigPropertyManagerFactory
  * @author Robert R Murrell
  */
@@ -1346,7 +1432,8 @@ class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
     }
     /**@return{string}*/getName() {return "AppConfigPropertyManagerFactory";}
     /**
-     * @param {{store:string, label:(null|undefined|string), useVault:(null|undefined|boolean)}} source
+     * @param {{store:string, label?:(null|string), useVault?:(null|boolean),
+     *          timeout?:(null|number), propertyResource?:(null|string), vaultResource?(null|string)}} source
      * @return {PropertyManager}
      */
     _createPropertyManager(source) {
@@ -1356,14 +1443,19 @@ class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
         let _label = "development";
         let _useVault = false;
         let _timeout = getDefaultTimeout(DEFAULT_TIMEOUT);
+        let _propRes = ManagedIdentityResource.MANAGED_IDENTITY;
+        let _vaultRes = _propRes;
         if(source.hasOwnProperty("label") && typeof source.label === "string" && source.label.trim().length > 0)
             _label = source.label;
         if(source.hasOwnProperty("useVault") && typeof source.useVault === "boolean")
             _useVault = source.useVault;
         if(source.hasOwnProperty("timeout") && typeof source.timeout === "number")
-            _timeout = source.timeout;
-        return new AppConfigPropertyManager(source.store, ManagedIdentityResource.MANAGED_IDENTITY,
-                                            ManagedIdentityResource.MANAGED_IDENTITY, _label, _useVault, _timeout);
+            _timeout = getDefaultTimeout(source.timeout);
+        if(source.hasOwnProperty("propertyResource") && typeof source.label === "string" && source.label.trim().length > 0)
+            _propRes = source.propertyResource;
+        if(source.hasOwnProperty("vaultResource") && typeof source.label === "string" && source.label.trim().length > 0)
+            _vaultRes = source.vaultResource;
+        return new AppConfigPropertyManager(source.store.trim(), _label, _propRes, _timeout, _useVault, _vaultRes);
     }
 }
 /**
@@ -1820,7 +1912,7 @@ class CoreConfigParser extends ConfigParser {
                 _Resources.authorizations != null) {
             /**@type{Array<ResourceAuthorization>}*/let _Authorizations = _Resources.authorizations;
             for (/**@type{ResourceAuthorization}*/let _ra of _Authorizations) {
-                _rm.addResource(_ra);
+                _rm.addResourceSync(_ra);
             }
         }
     }
@@ -2077,7 +2169,7 @@ class AddOnManager {
      * @return {Promise<void>}
      */
     async doLifeCycle(lifecycle, source, context, exception = null) {
-        /**@type{Set<AddOn>}*/let _addons = this._listeners.get(lifecycle);
+        /**@type{Set<(AddOn|{doLifeCycle?:function(Object)})>}*/let _addons = this._listeners.get(lifecycle);
         if(typeof _addons !== "undefined") {
             if(_addons.size > 0) {
                 let _lifecycle = new LifeCycle(context, source, lifecycle, exception);
@@ -2117,7 +2209,7 @@ class AddOnManager {
                 throw CelastrinaError.newError(_sunrslvd);
             }
             else {
-                for(let _addon of this._target) {
+                for(/**@type{(AddOn|{constructor})}*/let _addon of this._target) {
                     azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On " +
                         _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
                     if(parse) {
@@ -2150,7 +2242,7 @@ class AddOnManager {
         if(this._target.length > 0) {
             azcontext.log.info("[AddOnManager.initialize(azcontext, parse, cfp, atp)]: Initializing Add-On's.");
             let _promises = [];
-            for(/**@type{AddOn}*/let _addon of this._target) {
+            for(/**@type{(AddOn|{constructor})}*/let _addon of this._target) {
                 azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On " +
                     _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
                 _promises.push(_addon.initialize(azcontext, config));
@@ -2469,7 +2561,7 @@ class Configuration {
             _manager = new ResourceManager();
             this._config[Configuration.CONFIG_RESOURCE] = _manager;
         }
-        if(typeof process.env["IDENTITY_ENDPOINT"] === "string") _manager.addResource(new ManagedIdentityResource());
+        if(typeof process.env["IDENTITY_ENDPOINT"] === "string") _manager.addResourceSync(new ManagedIdentityResource());
         return _manager;
     }
     /**
@@ -2717,7 +2809,7 @@ class Cryptography {
      */
     async encrypt(value) {
         try {
-            let cryp = await this._algorithm.createCipher();
+            /**@type{Cipher}*/let cryp = await this._algorithm.createCipher();
             let encrypted = cryp.update(value, "utf8", "hex");
             encrypted += cryp.final("hex");
             encrypted = Buffer.from(encrypted, "hex").toString("base64");
@@ -2733,7 +2825,7 @@ class Cryptography {
      */
     async decrypt(value) {
         try {
-            let cryp = await this._algorithm.createDecipher();
+            /**@type{Decipher}*/let cryp = await this._algorithm.createDecipher();
             let encrypted = Buffer.from(value, "base64").toString("hex");
             let decrypted = cryp.update(encrypted, "hex", "utf8");
             decrypted += cryp.final("utf8");
@@ -2871,38 +2963,38 @@ class Permission {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Permission";}
     /**
      * @param {string} action
-     * @param {(Array<string>|Set<string>)} roles
+     * @param {(Array<string>|Set<string>)} assignments
      * @param {ValueMatch} [match]
      */
-    constructor(action, roles = new Set(), match = new MatchAny()) {
-        /**@type{Set<string>}*/this._roles = null;
-        if(roles instanceof Set)
-            this._roles = roles;
-        else if(Array.isArray(roles))
-            this._roles = new Set(roles);
+    constructor(action, assignments = new Set(), match = new MatchAny()) {
+        /**@type{Set<string>}*/this._assignments = null;
+        if(assignments instanceof Set)
+            this._assignments = assignments;
+        else if(Array.isArray(assignments))
+            this._assignments = new Set(assignments);
         else
-            this._roles = new Set();
+            this._assignments = new Set();
         this._action = action.toLowerCase();
         this._match = match;
     }
     /**@return{string}*/get action(){return this._action;}
-    /**@return{Set<string>}*/get roles(){return this._roles;}
+    /**@return{Set<string>}*/get assignments(){return this._assignments;}
     /**
-     * @param {string} role
+     * @param {string} assignment
      * @return {Permission}
      */
-    addRole(role){this._roles.add(role); return this;}
+    addAssignment(assignment){this._assignments.add(assignment); return this;}
     /**
-     * @param {(Array<string>|Set<string>)} roles
+     * @param {(Array<string>|Set<string>)} assignments
      * @return {Permission}
      */
-    addRoles(roles){this._roles = new Set([...this._roles, ...roles]); return this;}
+    addAssignments(assignments){this._assignments = new Set([...this._assignments, ...assignments]); return this;}
     /**
      * @param {Subject} subject
      * @return {Promise<boolean>}
      */
     async authorize(subject) {
-        return this._match.isMatch(subject.roles, this._roles);
+        return this._match.isMatch(subject.roles, this._assignments);
     }
 }
 /**
@@ -3090,11 +3182,11 @@ class Subject {
     }
 }
 /**
- * Asserter
+ * Assertion
  * @author Robert R Murrell
  */
-class Asserter {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Asserter";}
+class Assertion {
+    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Assertion";}
     /**
      * @param {Context} context
      * @param {Subject} subject
@@ -3103,11 +3195,11 @@ class Asserter {
      */
     constructor(context, subject, permissions, optimistic = false) {
         if(typeof context === "undefined" || context == null)
-            throw CelastrinaValidationError.newValidationError("Argument 'context' is required.", "Asserter.context");
+            throw CelastrinaValidationError.newValidationError("Argument 'context' is required.", "Assertion.context");
         if(typeof subject === "undefined" || subject == null)
-            throw CelastrinaValidationError.newValidationError("Argument 'subject' is required.", "Asserter.subject");
+            throw CelastrinaValidationError.newValidationError("Argument 'subject' is required.", "Assertion.subject");
         if(typeof permissions === "undefined" || permissions == null)
-            throw CelastrinaValidationError.newValidationError("Argument 'permissions' is required.", "Asserter.permissions");
+            throw CelastrinaValidationError.newValidationError("Argument 'permissions' is required.", "Assertion.permissions");
         this._context = context;
         this._subject = subject;
         this._permissions = permissions;
@@ -3128,12 +3220,22 @@ class Asserter {
      */
     assert(name, result = false, assignments = null, remarks = null) {
         if(typeof name !== "string" || name.trim().length === 0)
-            throw CelastrinaValidationError.newValidationError("Argument 'name' is required.", "Asserter.name");
+            throw CelastrinaValidationError.newValidationError("Argument 'name' is required.", "Assertion.name");
         if(assignments != null) this._assignments = new Set([...this._assignments, ...assignments]);
         this._assertions[name.trim()] = {res: result, rmks: remarks};
         return result;
     }
+    /**
+     * @param {string} name
+     * @return {Promise<void>}
+     */
     async getAssertion(name) {
+        return this.getAssertionSync(name);
+    }
+    /**
+     * @param {string} name
+     */
+    getAssertionSync(name) {
         let _assertion = this._assertions[name];
         if(typeof _assertion === "undefined") return null;
         else return _assertion;
@@ -3143,6 +3245,12 @@ class Asserter {
      * @return {Promise<void>}
      */
     async assign(subject) {
+        await this.assignSync(subject);
+    }
+    /**
+     * @param {Subject} subject
+     */
+    assignSync(subject) {
         subject.addRoles([...this._assignments]);
     }
     /**
@@ -3169,7 +3277,8 @@ class Authenticator {
      * @param {Authenticator} [link=null]
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
-    constructor(name = "Authenticator", required = false, link = null, timeout = DEFAULT_TIMEOUT) {
+    constructor(name = "Authenticator", required = false, link = null,
+                timeout = DEFAULT_TIMEOUT) {
         this._name = name;
         this._required = required;
         /**@type{Authenticator}*/this._link = link;
@@ -3184,63 +3293,68 @@ class Authenticator {
      */
     addLink(link) {(this._link == null) ? this._link = link : this._link.addLink(link);}
     /**
-     * @param {Asserter} assertion
+     * @param {Assertion} assertion
      * @return {Promise<void>}
      */
     async authenticate(assertion) {
         /**@type{boolean}*/let _result = await this._authenticate(assertion);
         if(!_result) {
             assertion.context.log("Subject '" + assertion.subject.id + "' failed to authenticate '" +
-                                          this._name + "'", LOG_LEVEL.THREAT, "Authenticator.authenticate(auth)");
-            if(this._required) throw CelastrinaError.newError("Not Authorized.", 401);
+                this._name + "'", LOG_LEVEL.THREAT, "Authenticator.authenticate(auth)");
+            if(this._required)
+                throw CelastrinaError.newError("Not Authorized.", 401);
         }
         if(this._link != null) return this._link.authenticate(assertion);
     }
     /**
-     * @param {Asserter} assertion
+     * @param {Assertion} assertion
      * @return {Promise<boolean>}
      * @abstract
      */
-    async _authenticate(assertion) {
-        throw CelastrinaError.newError("Not Implemented.", 501);
-    }
+    async _authenticate(assertion) {throw CelastrinaError.newError("Not Implemented.", 501);}
 }
 /**
- * Authorizor
+ * Authorizer
  * @authro Robert R Murrell
  */
-class Authorizor {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Authorizor";}
+class Authorizer {
+    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Authorizer";}
     /**
-     * @param {string} [name="Authorizor"]
-     * @param {Authorizor} [link=null]
+     * @param {string} [name="Authorizer"]
+     * @param {boolean} [required=false]
+     * @param {Authorizer} [link=null]
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
-    constructor(name= "Authorizor", link = null, timeout = DEFAULT_TIMEOUT) {
+    constructor(name= "Authorizer", required = false, link = null, timeout = DEFAULT_TIMEOUT) {
         this._name = name;
         this._link = link;
         this._timeout = getDefaultTimeout(timeout);
+        this._required = required;
     }
     /**@return{string}*/get name() {return this._name;}
     /**@return{number}*/get timeout() {return this._timeout;}
+    /**@return{boolean}*/get required() {return this._required;}
     /**@param{number}timeout*/set timeout(timeout) {this._timeout = getDefaultTimeout(timeout);}
     /**
-     * @param {Authorizor} link
+     * @param {Authorizer} link
      */
     addLink(link) {(this._link == null) ? this._link = link : this._link.addLink(link);}
     /**
-     * @param {Asserter} assertion
+     * @param {Assertion} assertion
      * @return {Promise<void>}
      */
     async authorize(assertion) {
         /**@type{boolean}*/let _result = await this._authorize(assertion);
-        if(!_result)
+        if(!_result) {
             assertion.context.log("Subject '" + assertion.subject.id + "' failed to authorize '" +
-                                          this._name + "'", LOG_LEVEL.THREAT, "Authorizor.authorize(context, subject, pm)");
+                this._name + "'", LOG_LEVEL.THREAT, "Authorizer.authorize(context, subject, pm)");
+            if(this._required)
+                throw CelastrinaError.newError("Forbidden.", 403);
+        }
         if(this._link != null) return this._link.authorize(assertion);
     }
     /**
-     * @param {Asserter} assertion
+     * @param {Assertion} assertion
      * @return {Promise<boolean>}
      */
     async _authorize(assertion) {
@@ -3264,13 +3378,13 @@ class Sentry {
      */
     constructor(timeout = DEFAULT_TIMEOUT) {
         /**@type{Authenticator}*/this._authenticator = null; // no authentication by default.
-        /**@type{Authorizor}*/this._authorizor = new Authorizor();
+        /**@type{Authorizer}*/this._authorizer = new Authorizer();
         /**@type{number}*/this._timeout = getDefaultTimeout(timeout);
     }
     /**@return{number}*/get timeout() {return this._timeout;}
     /**@param{number}timeout*/set timeout(timeout) {this._timeout = getDefaultTimeout(timeout);}
-    /**@return{Authenticator}*/get authenticatorChain() {return this._authenticator};
-    /**@return{Authorizor}*/get authorizorChain() {return this._authorizor};
+    /**@return{Authenticator}*/get authenticator() {return this._authenticator};
+    /**@return{Authorizer}*/get authorizer() {return this._authorizer};
     /**
      * @param {Authenticator} authenticator
      * @return {Sentry}
@@ -3284,15 +3398,15 @@ class Sentry {
         return this;
     }
     /**
-     * @param {Authorizor} authorizor
+     * @param {Authorizer} authorizer
      * @return {Sentry}
      */
-    addAuthorizor(authorizor) {
-        if(!instanceOfCelastrinaType(Authorizor, authorizor))
-            throw CelastrinaValidationError.newValidationError("Argument 'authorizor' must be type Authorizor.", "authorizor");
-        authorizor.timeout = this._timeout;
-        if(this._authorizor == null) this._authorizor = authorizor;
-        else this._authorizor.addLink(authorizor);
+    addAuthorizer(authorizer) {
+        if(!instanceOfCelastrinaType(Authorizer, authorizer))
+            throw CelastrinaValidationError.newValidationError("Argument 'authorizer' must be type Authorizer.", "authorizer");
+        authorizer.timeout = this._timeout;
+        if(this._authorizer == null) this._authorizer = authorizer;
+        else this._authorizer.addLink(authorizer);
         return this;
     }
     /**
@@ -3301,9 +3415,9 @@ class Sentry {
      */
     async authenticate(context) {
         let _subject = new Subject(context.requestId);
-        let _asserter = new Asserter(context, _subject, context.config.permissions, context.config.authorizationOptimistic);
+        let _asserter = new Assertion(context, _subject, context.config.permissions, context.config.authorizationOptimistic);
         /* Default behavior is to run un-authenticated and rely on authorization to enforce optimism
-           when no authenticator is specified. This is to avoid scenarios where the default Authorizor by-default
+           when no authenticator is specified. This is to avoid scenarios where the default Authorizer by-default
            returns true but optimistic is true and next link fails, making it pass authentication when optimistic.
            Simply returning false from the Authenticator is not sufficient as it produces the wrong behavior, or a 401
            instead of a 403. */
@@ -3334,8 +3448,8 @@ class Sentry {
      * @return {Promise<void>}
      */
     async authorize(context) {
-        let _asserter = new Asserter(context, context.subject, context.config.permissions, context.config.authorizationOptimistic);
-        await this._authorizor.authorize(_asserter);
+        let _asserter = new Assertion(context, context.subject, context.config.permissions, context.config.authorizationOptimistic);
+        await this._authorizer.authorize(_asserter);
         let _authorized = await _asserter.hasAffirmativeAssertion();
         if(_authorized || context.config.authorizationOptimistic) {
             if(!_authorized)
@@ -3765,6 +3879,7 @@ class BaseFunction extends CelastrinaFunction {
     }
 }
 module.exports = {
+    DEFAULT_TIMEOUT,
     getDefaultTimeout,
     instanceOfCelastrinaType,
     LOG_LEVEL,
@@ -3783,6 +3898,7 @@ module.exports = {
     CacheProperty: CacheProperty,
     CachedPropertyManager: CachedPropertyManager,
     PropertyManagerFactory: PropertyManagerFactory,
+    AppSettingsPropertyManagerFactory: AppSettingsPropertyManagerFactory,
     AppConfigPropertyManagerFactory: AppConfigPropertyManagerFactory,
     AttributeParser: AttributeParser,
     RoleFactoryParser: RoleFactoryParser,
@@ -3806,9 +3922,9 @@ module.exports = {
     RoleFactory: RoleFactory,
     DefaultRoleFactory: DefaultRoleFactory,
     Subject: Subject,
-    Asserter: Asserter,
+    Assertion: Assertion,
     Authenticator: Authenticator,
-    Authorizor: Authorizor,
+    Authorizer: Authorizer,
     Sentry: Sentry,
     Context: Context,
     BaseFunction: BaseFunction
