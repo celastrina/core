@@ -45,7 +45,7 @@ describe("Sentry", () => {
         it("Should construct with defaults without error", () => {
             let _sentry = new Sentry();
             assert.strictEqual(_sentry._authenticator, null, "Expected null Authenticaror");
-            assert.strictEqual(_sentry._authorizor != null, true, "Expected authorizer.");
+            assert.strictEqual(_sentry._authorizer != null, true, "Expected authorizer.");
         });
     });
     describe("#initialize(config)", () => {

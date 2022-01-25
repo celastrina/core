@@ -21,9 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-const {CelastrinaError, LOG_LEVEL, PropertyManager, CachePropertyManager, AppSettingsPropertyManager} = require("../Core");
+const {CelastrinaError, PropertyManager, AppSettingsPropertyManager, Configuration, ResourceManager,
+       ManagedIdentityResource} = require("../Core");
 const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
-const {MockResourceAuthorization} = require("./ResourceAuthorizationTest");
+const {MockAppConfigEndpoint} = require("./AppConfigPropertyManagerTest");
 const assert = require("assert");
 
 "use strict";
@@ -34,6 +35,10 @@ process.env["mock_env_var_three"] = true;
 process.env["mock_env_var_four"]  = "{\"key\": \"mock_key\", \"value\": \"mock_value\"}";
 process.env["mock_env_var_five"]  = "1995-12-17T03:24:00";
 process.env["mock_env_var_regexp"]  = "/.*/g";
+
+process.env["mock_env_var_vaultref"] = "{\"value\": \"{\\\"uri\\\":\\\"https://demo-celastrinajs-com.vault.azure.net/secrets/example-secret\\\"}\", \"content_type\": \"application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8\"}";
+
+
 
 class MockPropertyManager extends PropertyManager {
     constructor() {
@@ -243,6 +248,41 @@ describe("AppSettingsPropertyManager", () => {
             let _object = await _pm.getTypedProperty("mock_env_var_six", "object", {key: "mock_key", value: "mock_value"}, convertToNewObject);
             assert.deepStrictEqual(_object instanceof MockObject, true, "Instanceof MockObject");
             assert.deepStrictEqual(_object, new MockObject("mock_key", "mock_value"), "Mock object has correct values.");
+        });
+    });
+
+    describe("Vault Properties", () => {
+        it("Follows Vault Reference", async () => {
+            process.env["IDENTITY_ENDPOINT"] = "https://fake-azure-security-endpoint/";
+            process.env["IDENTITY_HEADER"] = "celastrinajs";
+            let _pm = new AppSettingsPropertyManager(true);
+            let _mockendpoint = new MockAppConfigEndpoint("mock-app-config");
+            let _azcontext = new MockAzureFunctionContext();
+            let _config = {};
+            let _rm = new ResourceManager();
+            _rm.addResourceSync(new ManagedIdentityResource());
+            _config[Configuration.CONFIG_RESOURCE] = _rm;
+            await _pm.initialize(_azcontext, _config);
+
+            await _mockendpoint.start();
+            let _value = await _pm.getProperty("mock_env_var_vaultref", null);
+            await _mockendpoint.stop();
+            assert.strictEqual(_value, "test_b", "Expected 'test_b'.");
+            delete process.env["IDENTITY_ENDPOINT"];
+        });
+        it("Does NOT Follows Vault Reference", async () => {
+            process.env["IDENTITY_ENDPOINT"] = "https://fake-azure-security-endpoint/";
+            process.env["IDENTITY_HEADER"] = "celastrinajs";
+            let _pm = new AppSettingsPropertyManager();
+            let _azcontext = new MockAzureFunctionContext();
+            let _config = {};
+            let _rm = new ResourceManager();
+            _rm.addResourceSync(new ManagedIdentityResource());
+            _config[Configuration.CONFIG_RESOURCE] = _rm;
+            await _pm.initialize(_azcontext, _config);
+            let _value = await _pm.getProperty("mock_env_var_vaultref", null);
+            assert.strictEqual(_value, "{\"value\": \"{\\\"uri\\\":\\\"https://demo-celastrinajs-com.vault.azure.net/secrets/example-secret\\\"}\", \"content_type\": \"application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8\"}", "Expected vault object.");
+            delete process.env["IDENTITY_ENDPOINT"];
         });
     });
 });
