@@ -29,7 +29,7 @@
 "use strict";
 const axios  = require("axios");
 const moment = require("moment");
-const { v4: uuidv4 } = require("uuid");
+const {v4: uuidv4} = require("uuid");
 const crypto = require("crypto");
 const {AuthenticationContext} = require("adal-node");
 const {AccessToken} = require("@azure/identity");
@@ -792,19 +792,123 @@ class PropertyManager {
 /**
  * AppSettingsPropertyManager
  * @author Robert R Murrell
+ * @property {number} _timeout
+ * @property {boolean} _followVaultReference
+ * @property {Vault} [_authVault = null]
+ * @property {(null|string)} [_vaultResource=null]
  */
 class AppSettingsPropertyManager extends PropertyManager {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManager";}
-    constructor() {
+    /**
+     * @param {boolean} [followVaultReference=true]
+     * @param {string} [vaultResource=ManagedIdentityResource.MANAGED_IDENTITY]
+     * @param {number} [timeout=DEFAULT_TIMEOUT]
+     */
+    constructor(followVaultReference = false, vaultResource = ManagedIdentityResource.MANAGED_IDENTITY,
+                timeout = DEFAULT_TIMEOUT) {
         super();
+        this._timeout = getDefaultTimeout(timeout);
+        /** @type{boolean}*/this._followVaultReference = followVaultReference;
+        if(this._followVaultReference) {
+            if(typeof vaultResource !== "string" || vaultResource.trim().length === 0)
+                throw CelastrinaValidationError.newValidationError("Arguemtn 'vaultResource' is required.", "vaultResource");
+            this._authVault = null;
+            this._vault = new Vault(this._timeout);
+            this._vaultResource = vaultResource;
+        }
+        else {
+            this._authVault = null;
+            this._vault = null;
+            this._vaultResource = null;
+        }
     }
     /**@return{string}*/get name() {return "AppSettingsPropertyManager";}
+    /**@return{Vault}*/get vault() {return this._vault;}
+    /**@return{boolean}*/get followVaultReferences() {return this._followVaultReference;}
+    /**@param{boolean}follow*/set followVaultReferences(follow) {
+        this._followVaultReference = follow;
+        if(this._followVaultReference) {
+            this._authVault = null;
+            this._vault = new Vault(this._timeout);
+        }
+        else {
+            this._authVault = null;
+            this._vault = null;
+        }
+    }
+    /**@return{number}*/get timeout() {return this._timeout;}
+    /**@param{number}timeout*/set timeout(timeout) {this._timeout = getDefaultTimeout(timeout);}
+    /**@return{string}*/get vaultResource() {return this._vaultResource;}
+    /**@param{string}resource*/set vaultResource(resource) {
+        if(typeof resource !== "string" || resource.trim().length === 0)
+            throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
+        this._vaultResource = resource;
+    }
+    /**
+     * @param azcontext
+     * @param config
+     * @return {Promise<void>}
+     */
+    async initialize(azcontext, config) {
+        if(this._followVaultReference) {
+            if(this._vaultResource === ManagedIdentityResource.MANAGED_IDENTITY) {
+                if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
+                    throw CelastrinaError.newError(
+                        "AppSettingsPropertyManager requires User or System Assigned Managed Identies to be enabled when following vault references.");
+            }
+            /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
+            this._authVault = await _rm.getResource(this._vaultResource);
+            if(!instanceOfCelastrinaType(ResourceAuthorization, this._authVault))
+                throw CelastrinaError.newError(
+                    "Vault resource authorization '" + this._vaultResource + "' not found. AppSettingsPropertyManager initialization failed.");
+        }
+    }
+    /**
+     * @param {{content_type?:string}} object
+     * @return {boolean}
+     */
+    isVaultReference(object) {
+        if(object.hasOwnProperty("content_type") && typeof object.content_type === "string" &&
+                object.content_type.trim().length > 0)
+            return (object.content_type.trim().toLowerCase() === "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8");
+        else return false;
+    }
+    /**
+     * @param {{content_type?:string,value?:string}} object
+     * @return {Promise<*>}
+     */
+    async resolveVaultReference(object) {
+        try {
+            /**@type{{uri?:string}}*/let _vlt = JSON.parse(object.value);
+            return await this._vault.getSecret(await this._authVault.getToken("https://vault.azure.net"), _vlt.uri);
+        }
+        catch(exception) {
+            throw CelastrinaError.wrapError(exception);
+        }
+    }
     /**
      * @param {string} key
      * @return {Promise<*>}
+     * @private
      */
     async _getProperty(key) {
-        return process.env[key];
+        let _value = process.env[key];
+        if(this._followVaultReference) {
+            if(typeof _value === "string" && _value.trim().length > 0) {
+                let _obj = _value.trim();
+                if(_obj.startsWith("{") && _obj.endsWith("}") && _obj.indexOf("content_type") > 0) {
+                    try {
+                        _obj = JSON.parse(_obj);
+                        if(this.isVaultReference(_obj)) _value = await this.resolveVaultReference(_obj);
+                    }
+                    catch(exception) {
+                        if(instanceOfCelastrinaType(CelastrinaError, exception) && exception.code === 404) return null;
+                        else throw CelastrinaError.wrapError(exception);
+                    }
+                }
+            }
+        }
+        return _value;
     }
 }
 /**
@@ -818,80 +922,58 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      * @param {string} [propResource = ManagedIdentityResource.MANAGED_IDENTITY]
      * @param {string} [vaultResource = ManagedIdentityResource.MANAGED_IDENTITY]
      * @param {string} [label="development"]
-     * @param {boolean} [useVaultSecrets=true]
+     * @param {boolean} [followVaultReference=true]
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
-    constructor(configStoreName, propResource = ManagedIdentityResource.MANAGED_IDENTITY,
-                vaultResource = ManagedIdentityResource.MANAGED_IDENTITY, label = "development",
-                useVaultSecrets = true, timeout = DEFAULT_TIMEOUT) {
-        super();
-        this._configStore = "https://" + configStoreName + ".azconfig.io";
-        this._endpoint = this._configStore + "/kv/{key}";
-        this._timeout = getDefaultTimeout(timeout);
+    constructor(configStoreName, label = "development", propResource = ManagedIdentityResource.MANAGED_IDENTITY,
+                timeout = DEFAULT_TIMEOUT, followVaultReference = true, vaultResource = ManagedIdentityResource.MANAGED_IDENTITY) {
+        super(followVaultReference, vaultResource, timeout);
+        if(typeof configStoreName !== "string" || configStoreName.trim().length === 0)
+            throw CelastrinaValidationError.newValidationError("Arguemtn 'configStoreName' is required.", "configStoreName");
         if(typeof propResource !== "string" || propResource.trim().length === 0)
             throw CelastrinaValidationError.newValidationError("Arguemtn 'propResource' is required.", "propResource");
-        if(typeof vaultResource !== "string" || vaultResource.trim().length === 0)
-            throw CelastrinaValidationError.newValidationError("Arguemtn 'vaultResource' is required.", "vaultResource");
+        this._configStore = "https://" + configStoreName + ".azconfig.io";
+        this._endpoint = this._configStore + "/kv/{key}";
         this._propResource = propResource.trim();
-        this._vaultResource = vaultResource.trim();
         this._params = new URLSearchParams();
         this._params.set("label", label);
         this._params.set("api-version", "1.0");
         /** @type {ResourceAuthorization} */this._authProp = null;
-        /** @type {ResourceAuthorization} */this._authVault = null;
-        /** @type{boolean} */this._useVaultSecrets = useVaultSecrets;
-        if(this._useVaultSecrets)
-            /** @type{Vault} */this._vault = new Vault(this._timeout);
     }
     /**@return{string}*/get name() {return "AppConfigPropertyManager";}
     /**@return{string}*/get configStore() {return this._configStore;}
-    /**@return{number}*/get timeout() {return this._timeout;}
-    /**@param{number}timeout*/set timeout(timeout) {this._timeout = getDefaultTimeout(timeout);}
-    /**@return{boolean}*/get useVault() {return this._useVaultSecrets;}
-    /**@param{boolean}useVault*/set useVault(useVault) {this._useVaultSecrets = useVault;}
     /**@return{string}*/get propertyResource() {return this._propResource;}
-    /**@return{string}*/get label() {return this._params.get("label");}
-    /**@return{string}*/get apiVersion() {return this._params.get("api-version");}
-    /**@return{Vault}*/get vault() {return this._vault;}
-    /**@param{string}label*/set label(label) {
-        if(typeof label !== "string" || label.trim().length === 0) this._params.set("label", "development");
-        else this._params.set("label", label.trim());
-    }
     /**@param{string}resource*/set propertyResource(resource) {
         if(typeof resource !== "string" || resource.trim().length === 0)
             throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
         this._propResource = resource.trim();
     }
-    /**@return{string}*/get vaultResource() {return this._vaultResource;}
-    /**@param{string}resource*/set vaultResource(resource) {
-        if(typeof resource !== "string" || resource.trim().length === 0)
-            throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
-        this._vaultResource = resource.trim();
+    /**@return{string}*/get label() {return this._params.get("label");}
+    /**@param{string}label*/set label(label) {
+        if(typeof label !== "string" || label.trim().length === 0) this._params.set("label", "development");
+        else this._params.set("label", label.trim());
     }
+    /**@return{string}*/get apiVersion() {return this._params.get("api-version");}
     /**
      * @param {_AzureFunctionContext} azcontext
      * @param {Object} config
      * @return {Promise<void>}
      */
     async initialize(azcontext, config) {
-        if(this._propResource === ManagedIdentityResource.MANAGED_IDENTITY) {
-            if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
-                throw CelastrinaError.newError(
-                    "AppConfigPropertyManager requires User or System Assigned Managed Identies to be enabled.");
-        }
-        /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
-        this._authProp = await _rm.getResource(this._propResource);
-        if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
-            throw CelastrinaError.newError(
-                "Property resource authorization '" + this._propResource + "' not found. AppConfigPropertyManager initialization failed.");
-        if(this._useVaultSecrets) {
-            if(this._vaultResource === this._propResource) this._authVault = this._authProp;
-            else {
-                this._authVault = await _rm.getResource(this._vaultResource);
-                if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
+        await super.initialize(azcontext, config);
+        if(this._authVault != null && (this._vaultResource === this._propResource))
+            this._authProp = this._authVault;
+        else {
+            if(this._propResource === ManagedIdentityResource.MANAGED_IDENTITY) {
+                if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
                     throw CelastrinaError.newError(
-                        "Vault resource authorization '" + this._vaultResource + "' not found. AppConfigPropertyManager initialization failed.");
+                        "AppConfigPropertyManager requires User Assigned or System Managed Identies to be enabled.");
             }
+            /**@type{ResourceManager}*/let _rm = config[Configuration.CONFIG_RESOURCE];
+            this._authProp = await _rm.getResource(this._propResource);
+            if(!instanceOfCelastrinaType(ResourceAuthorization, this._authProp))
+                throw CelastrinaError.newError(
+                    "Property resource authorization '" + this._propResource + "' not found. AppConfigPropertyManager initialization failed.");
         }
     }
     /**
@@ -901,45 +983,28 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      */
     async ready(azcontext, config) {}
     /**
-     * @param _config
-     * @return {Promise<*>}
-     * @private
-     */
-    async _resolveVaultReference(_config) {
-        /**@type{{uri?:string}}*/let _vlt = JSON.parse(_config.value);
-        return await this._vault.getSecret(await this._authVault.getToken("https://vault.azure.net"), _vlt.uri);
-    }
-    /**
-     * @param {{content_type?:string}} kvp
-     * @return {boolean}
-     * @private
-     */
-    _isVaultReference(kvp) {
-        return (kvp.content_type === "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8" &&
-                this._useVaultSecrets);
-    }
-    /**
      * @param {{value?:string}} kvp
-     * @return {Promise<*>}
-     * @private
+     * @return {Promise<string>}
      */
-    async _resolveFeatureFlag(kvp) {
-        return kvp.value;
+    async resolveFeatureFlag(kvp) {
+            return kvp.value;
     }
     /**
      * @param {{content_type?:string}} kvp
      * @return {boolean}
-     * @private
      */
-    _isFeatureFlag(kvp) {
-        return kvp.content_type === "application/vnd.microsoft.appconfig.ff+json;charset=utf-8";
+    isFeatureFlag(kvp) {
+        if(kvp.hasOwnProperty("content_type") && typeof kvp.content_type === "string" &&
+                kvp.content_type.trim().length > 0)
+            return (kvp.content_type.trim().toLowerCase() === "application/vnd.microsoft.appconfig.ff+json;charset=utf-8");
+        else return false;
     }
     /**
      * @param {string} key
      * @return {Promise<*>}
      * @private
      */
-    async _getAppConfigProperty(key) {
+    async _getProperty(key) {
         try {
             let token = await this._authProp.getToken(this._configStore);
             let _endpoint = this._endpoint.replace("{key}", key);
@@ -947,41 +1012,26 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
                                            {params: this._params,
                                                   headers: {"Authorization": "Bearer " + token,
                                                   timeout: this._timeout}});
-            let _value = response.data;
-            if(this._isVaultReference(_value))
-                return await this._resolveVaultReference(_value);
-            else if(this._isFeatureFlag(_value))
-                return await this._resolveFeatureFlag(_value);
+            /**@type{{content_type:string,value:string}}*/let _config = response.data;
+            if(this._followVaultReference && this.isVaultReference(_config))
+                return await this.resolveVaultReference(_config);
+            else if(this.isFeatureFlag(_config))
+                return await this.resolveFeatureFlag(_config);
             else
-                return _value.value;
+                return _config.value;
         }
         catch(exception) {
             if(instanceOfCelastrinaType(CelastrinaError, exception))
                 throw exception;
             else if(typeof exception === "object" && exception.hasOwnProperty("response")) {
                 if(exception.response.status === 404)
-                    throw CelastrinaError.newError("App Configuration '" + key + "' not found.", 404);
+                    return await super._getProperty(key); // Attempt to get an override locally.
                 else
                     throw CelastrinaError.newError("Exception getting App Configuration '" + key + "': " +
                                                            exception.response.statusText, exception.response.status);
             }
             else
                 throw CelastrinaError.newError("Exception getting App Configuration '" + key + "'.");
-        }
-    }
-    /**
-     * @param {string} key
-     * @return {Promise<*>}
-     */
-    async _getProperty(key) {
-        try {
-            return await this._getAppConfigProperty(key);
-        }
-        catch(exception) {
-            if(exception.code === 404)
-                return await super._getProperty(key);
-            else
-                throw exception;
         }
     }
 }
@@ -1342,6 +1392,35 @@ class PropertyManagerFactory {
     }
 }
 /**
+ * AppSettingsPropertyManagerFactory
+ * @author Robert R Murrell
+ */
+class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
+    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManagerFactory";}
+    static PROP_USE_APP_SETTINGS = "celastrinajs.core.property.appsettings.config";
+    constructor(name = AppSettingsPropertyManagerFactory.PROP_USE_APP_SETTINGS) {
+        super(name);
+    }
+    /**@return{string}*/getName() {return "AppSettingsPropertyManagerFactory";}
+    /**
+     * @param {{store:string, label?:(null|string), useVault?:(null|boolean),
+     *          timeout?:(null|number), propertyResource?:(null|string), vaultResource?(null|string)}} source
+     * @return {PropertyManager}
+     */
+    _createPropertyManager(source) {
+        let _useVault = false;
+        let _timeout = getDefaultTimeout(DEFAULT_TIMEOUT);
+        let _vaultRes = ManagedIdentityResource.MANAGED_IDENTITY;
+        if(source.hasOwnProperty("useVault") && typeof source.useVault === "boolean")
+            _useVault = source.useVault;
+        if(source.hasOwnProperty("timeout") && typeof source.timeout === "number")
+            _timeout = getDefaultTimeout(source.timeout);
+        if(source.hasOwnProperty("vaultResource") && typeof source.label === "string" && source.label.trim().length > 0)
+            _vaultRes = source.vaultResource;
+        return new AppSettingsPropertyManager(_useVault, _vaultRes, _timeout);
+    }
+}
+/**
  * AppConfigPropertyManagerFactory
  * @author Robert R Murrell
  */
@@ -1353,7 +1432,8 @@ class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
     }
     /**@return{string}*/getName() {return "AppConfigPropertyManagerFactory";}
     /**
-     * @param {{store:string, label:(null|undefined|string), useVault:(null|undefined|boolean)}} source
+     * @param {{store:string, label?:(null|string), useVault?:(null|boolean),
+     *          timeout?:(null|number), propertyResource?:(null|string), vaultResource?(null|string)}} source
      * @return {PropertyManager}
      */
     _createPropertyManager(source) {
@@ -1363,14 +1443,19 @@ class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
         let _label = "development";
         let _useVault = false;
         let _timeout = getDefaultTimeout(DEFAULT_TIMEOUT);
+        let _propRes = ManagedIdentityResource.MANAGED_IDENTITY;
+        let _vaultRes = _propRes;
         if(source.hasOwnProperty("label") && typeof source.label === "string" && source.label.trim().length > 0)
             _label = source.label;
         if(source.hasOwnProperty("useVault") && typeof source.useVault === "boolean")
             _useVault = source.useVault;
         if(source.hasOwnProperty("timeout") && typeof source.timeout === "number")
-            _timeout = source.timeout;
-        return new AppConfigPropertyManager(source.store, ManagedIdentityResource.MANAGED_IDENTITY,
-                                            ManagedIdentityResource.MANAGED_IDENTITY, _label, _useVault, _timeout);
+            _timeout = getDefaultTimeout(source.timeout);
+        if(source.hasOwnProperty("propertyResource") && typeof source.label === "string" && source.label.trim().length > 0)
+            _propRes = source.propertyResource;
+        if(source.hasOwnProperty("vaultResource") && typeof source.label === "string" && source.label.trim().length > 0)
+            _vaultRes = source.vaultResource;
+        return new AppConfigPropertyManager(source.store.trim(), _label, _propRes, _timeout, _useVault, _vaultRes);
     }
 }
 /**
@@ -3813,6 +3898,7 @@ module.exports = {
     CacheProperty: CacheProperty,
     CachedPropertyManager: CachedPropertyManager,
     PropertyManagerFactory: PropertyManagerFactory,
+    AppSettingsPropertyManagerFactory: AppSettingsPropertyManagerFactory,
     AppConfigPropertyManagerFactory: AppConfigPropertyManagerFactory,
     AttributeParser: AttributeParser,
     RoleFactoryParser: RoleFactoryParser,

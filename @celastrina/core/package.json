@@ -1,6 +1,6 @@
 {
   "name": "@celastrina/core",
-  "version": "4.13.37",
+  "version": "4.13.38",
   "description": "Javascript Framework for simplifying Microsoft Azure Functions and supporting resources.",
   "main": "Core.js",
   "scripts": {

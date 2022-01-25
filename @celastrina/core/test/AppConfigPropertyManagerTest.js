@@ -21,9 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-const {CelastrinaError, LOG_LEVEL, AppConfigPropertyManager, Configuration, ManagedIdentityResource, ResourceManager} = require("../Core");
+const {AppConfigPropertyManager, Configuration, ManagedIdentityResource, ResourceManager} = require("../Core");
 const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
-const {MockPropertyManager} = require("./PropertyManagerTest");
 const MockAdapter = require("axios-mock-adapter");
 const assert = require("assert");
 const axios = require("axios");
@@ -34,7 +33,7 @@ const moment = require("moment");
  * @property {string} key
  * @property {string} value
  * @property {("kvp"|"feature"|"vaultref")} type
- * @property {(null|string)} contentType
+ * @property {(null|string)} content_type
  */
 /**
  *
@@ -89,7 +88,7 @@ class MockAppConfigEndpoint {
         this._mock.onGet(new RegExp("https:\/\/demo-celastrinajs-com.vault.azure.net\/secrets\/example-secret.*")).reply((config) => {
             return [200, {
                 value: "test_b",
-                contentType: "text/plain; charset=utf-8",
+                content_type: "text/plain; charset=utf-8",
                 id: "https://demo-celastrinajs-com.vault.azure.net/secrets/example-secret/d4a13ffb0a764302b29dd22cfc464ed4",
                 attributes: {
                     enabled: true,
@@ -142,7 +141,7 @@ class MockAppConfigEndpoint {
                                 etag: "yAxcsTBeBrAuL0VpwiaKqso6usB",
                                 key: _config.key,
                                 label: _this._label,
-                                content_type: _config.contentType,
+                                content_type: _config.content_type,
                                 value: _config.value,
                                 tags: {},
                                 locked: false,
@@ -153,7 +152,7 @@ class MockAppConfigEndpoint {
                                     etag: "99Lg3nB6CkUBjne1mSTI2MaQGuw",
                                     key: _config.key,
                                     label: _this._label,
-                                    content_type: _config.contentType,
+                                    content_type: _config.content_type,
                                     value: _config.value,
                                     tags: {},
                                     locked: false,
@@ -164,7 +163,7 @@ class MockAppConfigEndpoint {
                                 etag: "yTIbqkPmbrRElzndCTKFcV5MpFD",
                                 key: _config.key,
                                 label: _this._label,
-                                content_type: _config.contentType,
+                                content_type: _config.content_type,
                                 value: _config.value,
                                 tags: {},
                                 locked: false,
@@ -191,20 +190,20 @@ describe("AppConfigPropertyManager", () => {
             assert.strictEqual(_config._endpoint, "https://mock-config-store.azconfig.io/kv/{key}", "Expected 'https://mock-config-store.azconfig.io/kv/{key}'.");
             assert.strictEqual(_config.propertyResource, ManagedIdentityResource.MANAGED_IDENTITY, "Expected '" + ManagedIdentityResource.MANAGED_IDENTITY + "'.");
             assert.strictEqual(_config.vaultResource, ManagedIdentityResource.MANAGED_IDENTITY, "Expected '" + ManagedIdentityResource.MANAGED_IDENTITY + "'.");
-            assert.strictEqual(_config.useVault, true, "Expected true.");
+            assert.strictEqual(_config.followVaultReferences, true, "Expected true.");
             assert.strictEqual(_config.label, "development", "Expected 'development'.");
             assert.strictEqual(_config.apiVersion, "1.0", "Expected '1.0'.");
             assert.strictEqual(_config.vault == null, false, "Expected false.");
         });
         it("should set AppConfigPropertyManager values", () => {
-            let _config = new AppConfigPropertyManager("mock-config-store", "test123", "test456", "dummy-label", false, 5000);
+            let _config = new AppConfigPropertyManager("mock-config-store", "dummy-label", "test123", 5000, false, "test456");
             assert.strictEqual(_config.name, "AppConfigPropertyManager", "Expected 'AppConfigPropertyManager'.");
             assert.strictEqual(_config.configStore, "https://mock-config-store.azconfig.io", "Expected 'https://mock-config-store.azconfig.io'.");
             assert.strictEqual(_config.timeout, 5000, "Expected 5000.");
             assert.strictEqual(_config._endpoint, "https://mock-config-store.azconfig.io/kv/{key}", "Expected 'https://mock-config-store.azconfig.io/kv/{key}'.");
             assert.strictEqual(_config.propertyResource, "test123", "Expected 'test123'.");
-            assert.strictEqual(_config.vaultResource, "test456", "Expected 'test456'.");
-            assert.strictEqual(_config.useVault, false, "Expected false.");
+            assert.strictEqual(_config.vaultResource, null, "Expected null.");
+            assert.strictEqual(_config.followVaultReferences, false, "Expected false.");
             assert.strictEqual(_config.label, "dummy-label", "Expected 'dummy-label'.");
             assert.strictEqual(_config.apiVersion, "1.0", "Expected '1.0'.");
             assert.strictEqual(_config.vault == null, true, "Expected true.");
@@ -218,7 +217,7 @@ describe("AppConfigPropertyManager", () => {
             let _config = {};
             let _pm = new AppConfigPropertyManager("mock-config-store");
             let _rm = new ResourceManager();
-            _rm.addResource(new ManagedIdentityResource());
+            _rm.addResourceSync(new ManagedIdentityResource());
             let _mi = await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
             _config[Configuration.CONFIG_RESOURCE] = _rm;
             await assert.doesNotReject(_pm.initialize(_azcontext, _config));
@@ -232,9 +231,9 @@ describe("AppConfigPropertyManager", () => {
             let _azcontext = new MockAzureFunctionContext();
             let _config = {};
             let _pm = new AppConfigPropertyManager("mock-config-store");
-            _pm.useVault = false;
+            _pm.followVaultReferences = false;
             let _rm = new ResourceManager();
-            _rm.addResource(new ManagedIdentityResource());
+            _rm.addResourceSync(new ManagedIdentityResource());
             let _mi = await _rm.getResource(ManagedIdentityResource.MANAGED_IDENTITY);
             _config[Configuration.CONFIG_RESOURCE] = _rm;
             await assert.doesNotReject(_pm.initialize(_azcontext, _config));
@@ -253,8 +252,7 @@ describe("AppConfigPropertyManager", () => {
             _config.setValue(Configuration.CONFIG_PROPERTY, _appcfg);
             let _azcontext = new MockAzureFunctionContext();
             let _mockendpoint = new MockAppConfigEndpoint("mock-app-config");
-            _mockendpoint.mockAppConfiguration({key: "mock_kvp_item", type: "kvp", value: "test_a",
-                                                       contentType: ""});
+            _mockendpoint.mockAppConfiguration({key: "mock_kvp_item", type: "kvp", value: "test_a", content_type: ""});
             await _config.initialize(_azcontext);
             await _mockendpoint.start();
             let _value = await _config.properties.getProperty("mock_kvp_item");
@@ -275,7 +273,7 @@ describe("AppConfigPropertyManager", () => {
             let _mockendpoint = new MockAppConfigEndpoint("mock-app-config");
             _mockendpoint.mockAppConfiguration({key: "mock_ftr_item", type: "feature",
                 value: "{\"id\":\"celastrinajs-feature-test\",\"description\":\"\",\"enabled\":true,\"conditions\":{\"client_filters\":[]}}",
-                contentType: "application/vnd.microsoft.appconfig.ff+json;charset=utf-8"});
+                content_type: "application/vnd.microsoft.appconfig.ff+json;charset=utf-8"});
             await _config.initialize(_azcontext);
             await _mockendpoint.start();
             let _value = await _config.properties.getObject("mock_ftr_item");
@@ -296,7 +294,7 @@ describe("AppConfigPropertyManager", () => {
             let _mockendpoint = new MockAppConfigEndpoint("mock-app-config");
             _mockendpoint.mockAppConfiguration({key: "mock_vlt_item", type: "vaultref",
                 value: "{\"uri\":\"https://demo-celastrinajs-com.vault.azure.net/secrets/example-secret\"}",
-                contentType: "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8"});
+                content_type: "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8"});
             await _config.initialize(_azcontext);
             await _mockendpoint.start();
             let _value = await _config.properties.getProperty("mock_vlt_item");
@@ -308,3 +306,7 @@ describe("AppConfigPropertyManager", () => {
         });
     });
 });
+
+module.exports = {
+    MockAppConfigEndpoint: MockAppConfigEndpoint
+};
