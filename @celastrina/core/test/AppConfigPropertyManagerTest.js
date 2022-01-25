@@ -185,27 +185,21 @@ describe("AppConfigPropertyManager", () => {
         it("creates AppConfigPropertyManager with defaults", () => {
             let _config = new AppConfigPropertyManager("mock-config-store");
             assert.strictEqual(_config.name, "AppConfigPropertyManager", "Expected 'AppConfigPropertyManager'.");
-            assert.strictEqual(_config.configStore, "https://mock-config-store.azconfig.io", "Expected 'https://mock-config-store.azconfig.io'.");
+            assert.strictEqual(_config.configStore, "mock-config-store", "Expected 'mock-config-store'.");
             assert.strictEqual(_config.timeout, 5000, "Expected 5000.");
-            assert.strictEqual(_config._endpoint, "https://mock-config-store.azconfig.io/kv/{key}", "Expected 'https://mock-config-store.azconfig.io/kv/{key}'.");
             assert.strictEqual(_config.propertyResource, ManagedIdentityResource.MANAGED_IDENTITY, "Expected '" + ManagedIdentityResource.MANAGED_IDENTITY + "'.");
             assert.strictEqual(_config.vaultResource, ManagedIdentityResource.MANAGED_IDENTITY, "Expected '" + ManagedIdentityResource.MANAGED_IDENTITY + "'.");
             assert.strictEqual(_config.followVaultReferences, true, "Expected true.");
-            assert.strictEqual(_config.label, "development", "Expected 'development'.");
-            assert.strictEqual(_config.apiVersion, "1.0", "Expected '1.0'.");
             assert.strictEqual(_config.vault == null, false, "Expected false.");
         });
         it("should set AppConfigPropertyManager values", () => {
-            let _config = new AppConfigPropertyManager("mock-config-store", "dummy-label", "test123", 5000, false, "test456");
+            let _config = new AppConfigPropertyManager("mock-config-store", "test123", false, "test456", 5000);
             assert.strictEqual(_config.name, "AppConfigPropertyManager", "Expected 'AppConfigPropertyManager'.");
-            assert.strictEqual(_config.configStore, "https://mock-config-store.azconfig.io", "Expected 'https://mock-config-store.azconfig.io'.");
+            assert.strictEqual(_config.configStore, "mock-config-store", "Expected 'mock-config-store'.");
             assert.strictEqual(_config.timeout, 5000, "Expected 5000.");
-            assert.strictEqual(_config._endpoint, "https://mock-config-store.azconfig.io/kv/{key}", "Expected 'https://mock-config-store.azconfig.io/kv/{key}'.");
             assert.strictEqual(_config.propertyResource, "test123", "Expected 'test123'.");
             assert.strictEqual(_config.vaultResource, null, "Expected null.");
             assert.strictEqual(_config.followVaultReferences, false, "Expected false.");
-            assert.strictEqual(_config.label, "dummy-label", "Expected 'dummy-label'.");
-            assert.strictEqual(_config.apiVersion, "1.0", "Expected '1.0'.");
             assert.strictEqual(_config.vault == null, true, "Expected true.");
         });
     });
@@ -223,6 +217,9 @@ describe("AppConfigPropertyManager", () => {
             await assert.doesNotReject(_pm.initialize(_azcontext, _config));
             assert.deepStrictEqual(_pm._authProp, _mi, "Expected _mi.");
             assert.deepStrictEqual(_pm._authVault, _mi, "Expected _mi.");
+            assert.strictEqual(_pm._endpoint, "https://mock-config-store.azconfig.io/kv/{key}", "Expected 'https://mock-config-store.azconfig.io/kv/{key}'.");
+            assert.strictEqual(_pm.label, "development", "Expected 'development'.");
+            assert.strictEqual(_pm.apiVersion, "1.0", "Expected '1.0'.");
             delete process.env["IDENTITY_ENDPOINT"];
         });
         it("should initialize, without vault", async () => {
@@ -239,6 +236,9 @@ describe("AppConfigPropertyManager", () => {
             await assert.doesNotReject(_pm.initialize(_azcontext, _config));
             assert.deepStrictEqual(_pm._authProp, _mi, "Expected _mi.");
             assert.strictEqual(_pm._authVault, null, "Expected null.");
+            assert.strictEqual(_pm._endpoint, "https://mock-config-store.azconfig.io/kv/{key}", "Expected 'https://mock-config-store.azconfig.io/kv/{key}'.");
+            assert.strictEqual(_pm.label, "development", "Expected 'development'.");
+            assert.strictEqual(_pm.apiVersion, "1.0", "Expected '1.0'.");
             delete process.env["IDENTITY_ENDPOINT"];
         });
     });

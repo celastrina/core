@@ -918,42 +918,48 @@ class AppSettingsPropertyManager extends PropertyManager {
 class AppConfigPropertyManager extends AppSettingsPropertyManager {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppConfigPropertyManager";}
     /**
-     * @param {string} configStoreName
-     * @param {string} [propResource = ManagedIdentityResource.MANAGED_IDENTITY]
+     * @param {(null|string)} [configStore=null]
+     * @param {string} [propResource=ManagedIdentityResource.MANAGED_IDENTITY]
      * @param {string} [vaultResource = ManagedIdentityResource.MANAGED_IDENTITY]
-     * @param {string} [label="development"]
      * @param {boolean} [followVaultReference=true]
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
-    constructor(configStoreName, label = "development", propResource = ManagedIdentityResource.MANAGED_IDENTITY,
-                timeout = DEFAULT_TIMEOUT, followVaultReference = true, vaultResource = ManagedIdentityResource.MANAGED_IDENTITY) {
+    constructor(configStore = null, propResource = ManagedIdentityResource.MANAGED_IDENTITY,
+                followVaultReference = true, vaultResource = ManagedIdentityResource.MANAGED_IDENTITY,
+                timeout = DEFAULT_TIMEOUT) {
         super(followVaultReference, vaultResource, timeout);
-        if(typeof configStoreName !== "string" || configStoreName.trim().length === 0)
-            throw CelastrinaValidationError.newValidationError("Arguemtn 'configStoreName' is required.", "configStoreName");
-        if(typeof propResource !== "string" || propResource.trim().length === 0)
-            throw CelastrinaValidationError.newValidationError("Arguemtn 'propResource' is required.", "propResource");
-        this._configStore = "https://" + configStoreName + ".azconfig.io";
-        this._endpoint = this._configStore + "/kv/{key}";
-        this._propResource = propResource.trim();
-        this._params = new URLSearchParams();
-        this._params.set("label", label);
-        this._params.set("api-version", "1.0");
-        /** @type {ResourceAuthorization} */this._authProp = null;
+        /**@type{(null|string)}*/this._configStore = configStore;
+        /**@type{(null|string)}*/this._endpoint = null;
+        /**@type{(null|string)}*/this._propResource = propResource;
+        /**@type{(null|string)}*/this._label = "development";
+        /**@type{(null|string)}*/this._version = "1.0";
+        /**@type {ResourceAuthorization} */this._authProp = null;
+        /**@type{URLSearchParams}*/this._params = new URLSearchParams();
+
     }
     /**@return{string}*/get name() {return "AppConfigPropertyManager";}
     /**@return{string}*/get configStore() {return this._configStore;}
+    /**@param{string}store*/set configStore(store) {
+        if(typeof store !== "string" || store.trim().length === 0)
+            throw new CelastrinaValidationError.newValidationError("Parameter 'store' is required.", "store");
+        this._configStore = store;
+    }
     /**@return{string}*/get propertyResource() {return this._propResource;}
     /**@param{string}resource*/set propertyResource(resource) {
         if(typeof resource !== "string" || resource.trim().length === 0)
-            throw new CelastrinaValidationError.newValidationError("Argument 'resource' is required.", "resource");
+            throw new CelastrinaValidationError.newValidationError("Parameter 'resource' is required.", "resource");
         this._propResource = resource.trim();
     }
     /**@return{string}*/get label() {return this._params.get("label");}
     /**@param{string}label*/set label(label) {
-        if(typeof label !== "string" || label.trim().length === 0) this._params.set("label", "development");
-        else this._params.set("label", label.trim());
+        if(typeof label !== "string" || label.trim().length === 0) this._label = "development";
+        else this._label = label;
     }
-    /**@return{string}*/get apiVersion() {return this._params.get("api-version");}
+    /**@return{string}*/get apiVersion() {return this._version;}
+    /**@param{string}version*/set apiVersion(version) {
+        if(typeof version !== "string" || version.trim().length === 0) this._version = "1.0";
+        else this._version = version;
+    }
     /**
      * @param {_AzureFunctionContext} azcontext
      * @param {Object} config
@@ -961,6 +967,15 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      */
     async initialize(azcontext, config) {
         await super.initialize(azcontext, config);
+
+        if(typeof this._configStore !== "string" || this._configStore.trim().length === 0)
+            throw new CelastrinaValidationError.newValidationError("Property '_configStore' is required.", "_configStore");
+        if(typeof this._propResource !== "string" || this._propResource.trim().length === 0)
+            throw new CelastrinaValidationError.newValidationError("Property '_propResource' is required.", "_propResource");
+        this._configStore = "https://" + this._configStore.trim() + ".azconfig.io";
+        this._endpoint = this._configStore + "/kv/{key}";
+        this._params.set("label", this._label);
+        this._params.set("api-version", this._version);
         if(this._authVault != null && (this._vaultResource === this._propResource))
             this._authProp = this._authVault;
         else {
@@ -1315,29 +1330,45 @@ class CachedPropertyManager extends PropertyManager {
  */
 class PropertyManagerFactory {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PropertyManagerFactory";}
-    /**@param{(null|string)}[name=null]*/
-    constructor(name = null) {
-        this._name = name;
-    }
-    /**@return{string}*/get name(){return this._name}
     /**
+     * @param {(null|string)}[_property=null]
+     * @param {boolean} [optional=false]
+     */
+    constructor(_property = null, optional = false) {
+        this._property = _property;
+        this._optional = optional;
+    }
+    /**@return{string}*/get property(){return this._property;}
+    /**@return{boolean}*/get optional(){return this._optional;}
+    /**
+     * @return {string}
      * @abstract
+     */
+    get name() {return "PropertyManagerFactory";}
+    /**
+     * @param {_AzureFunctionContext} azcontext
      * @return {PropertyManager}
+     * @abstract
      * @private
      */
-    _createPropertyManager(source) {throw CelastrinaError.newError("Not Implemented.", 501);}
+    _create(azcontext) {throw CelastrinaError.newError("Not Implemented.", 501);}
     /**
+     * @param {_AzureFunctionContext} azcontext
+     * @param {PropertyManager} manager
+     * @param {Object} source
+     * @return {PropertyManager}
      * @abstract
-     * @return {string}
+     * @private
      */
-    getName() {return "PropertyManagerFactory";}
+    _load(azcontext, manager, source) {throw CelastrinaError.newError("Not Implemented.", 501);}
     /**
+     * @param {_AzureFunctionContext} azcontext
      * @param {PropertyManager} manager
      * @param {Object} source
      * @return {PropertyManager}
      * @private
      */
-    _createCache(manager, source) {
+    _cache(azcontext, manager, source) {
         if(source.hasOwnProperty("cache") && typeof source.cache === "object" && source.cache != null) {
             let _cache = source.cache;
             let _ttl = 5;
@@ -1376,19 +1407,22 @@ class PropertyManagerFactory {
             return manager;
     }
     /**
+     * @param {_AzureFunctionContext} azcontext
      * @return{PropertyManager}
      */
-    createPropertyManager() {
-        let lname = this._name;
-        if(typeof lname === "undefined" || lname == null)
-            lname = Configuration.CONFIG_PROPERTY;
-        /**@type{string}*/let config = process.env[lname];
+    createPropertyManager(azcontext) {
+        if(typeof this._property === "undefined" || this._property == null)
+            this._property = Configuration.CONFIG_PROPERTY;
+        /**@type{string}*/let config = process.env[this._property];
+        /**@type{PropertyManager}*/let _pm = this._create(azcontext);
+        if(!instanceOfCelastrinaType(PropertyManager, _pm)) throw CelastrinaError.newError("Invalid Property Manager type, expected instace of PropertyManager.");
         if(typeof config === "string" && config.trim().length > 0) {
             /**@type{Object}*/let source = JSON.parse(config);
-            return this._createCache(this._createPropertyManager(source), source);
+            return this._cache(azcontext, this._load(azcontext, _pm, source), source);
         }
-        else
-            throw CelastrinaError.newError("Invalid Configuration for property '" + lname + "'.");
+        else if(!this._optional)
+            throw CelastrinaError.newError("Invalid property '" + this._property + "' for Property Manager Factory '" + this.name + "'.");
+        else return _pm;
     }
 }
 /**
@@ -1398,16 +1432,26 @@ class PropertyManagerFactory {
 class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManagerFactory";}
     static PROP_USE_APP_SETTINGS = "celastrinajs.core.property.appsettings.config";
-    constructor(name = AppSettingsPropertyManagerFactory.PROP_USE_APP_SETTINGS) {
-        super(name);
+    constructor(property = AppSettingsPropertyManagerFactory.PROP_USE_APP_SETTINGS) {
+        super(property, true);
     }
-    /**@return{string}*/getName() {return "AppSettingsPropertyManagerFactory";}
+    /**@return{string}*/get name() {return "AppSettingsPropertyManagerFactory";}
     /**
-     * @param {{store:string, label?:(null|string), useVault?:(null|boolean),
-     *          timeout?:(null|number), propertyResource?:(null|string), vaultResource?(null|string)}} source
+     * @param {_AzureFunctionContext} azcontext
      * @return {PropertyManager}
+     * @abstract
+     * @private
      */
-    _createPropertyManager(source) {
+    _create(azcontext) {return new AppSettingsPropertyManager();}
+    /**
+     * @param {_AzureFunctionContext} azcontext
+     * @param {PropertyManager | AppSettingsPropertyManager} manager
+     * @param {Object} source
+     * @return {PropertyManager}
+     * @abstract
+     * @private
+     */
+    _load(azcontext, manager, source) {
         let _useVault = false;
         let _timeout = getDefaultTimeout(DEFAULT_TIMEOUT);
         let _vaultRes = ManagedIdentityResource.MANAGED_IDENTITY;
@@ -1417,7 +1461,10 @@ class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
             _timeout = getDefaultTimeout(source.timeout);
         if(source.hasOwnProperty("vaultResource") && typeof source.label === "string" && source.label.trim().length > 0)
             _vaultRes = source.vaultResource;
-        return new AppSettingsPropertyManager(_useVault, _vaultRes, _timeout);
+        manager.followVaultReferences = _useVault;
+        manager.timeout = _timeout;
+        manager.vaultResource = _vaultRes;
+        return manager;
     }
 }
 /**
@@ -1427,18 +1474,28 @@ class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
 class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
     /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppConfigPropertyManagerFactory";}
     static PROP_USE_APP_CONFIG = "celastrinajs.core.property.appconfig.config";
-    constructor(name = AppConfigPropertyManagerFactory.PROP_USE_APP_CONFIG) {
-        super(name);
+    constructor(property = AppConfigPropertyManagerFactory.PROP_USE_APP_CONFIG) {
+        super(property, false);
     }
-    /**@return{string}*/getName() {return "AppConfigPropertyManagerFactory";}
+    /**@return{string}*/get name() {return "AppConfigPropertyManagerFactory";}
     /**
-     * @param {{store:string, label?:(null|string), useVault?:(null|boolean),
-     *          timeout?:(null|number), propertyResource?:(null|string), vaultResource?(null|string)}} source
+     * @param {_AzureFunctionContext} azcontext
      * @return {PropertyManager}
+     * @abstract
+     * @private
      */
-    _createPropertyManager(source) {
+    _create(azcontext) {return new AppConfigPropertyManager();}
+    /**
+     * @param {_AzureFunctionContext} azcontext
+     * @param {PropertyManager | AppConfigPropertyManager} manager
+     * @param {Object} source
+     * @return {PropertyManager}
+     * @abstract
+     * @private
+     */
+    _load(azcontext, manager, source) {
         if(!source.hasOwnProperty("store") || typeof source.store !== "string" ||
-                source.store.trim().length === 0)
+            source.store.trim().length === 0)
             throw CelastrinaValidationError.newValidationError("Attribute 'store' is required.", "store");
         let _label = "development";
         let _useVault = false;
@@ -1455,7 +1512,13 @@ class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
             _propRes = source.propertyResource;
         if(source.hasOwnProperty("vaultResource") && typeof source.label === "string" && source.label.trim().length > 0)
             _vaultRes = source.vaultResource;
-        return new AppConfigPropertyManager(source.store.trim(), _label, _propRes, _timeout, _useVault, _vaultRes);
+        manager.configStore = source.store;
+        manager.label = _label;
+        manager.followVaultReferences = _useVault;
+        manager.propertyResource = _propRes;
+        manager.vaultResource = _vaultRes;
+        manager.timeout = _timeout;
+        return manager;
     }
 }
 /**
@@ -2309,7 +2372,7 @@ class Configuration {
         /**@type{AddOnManager}*/this._addons = new AddOnManager();
         this._config[Configuration.CONFIG_NAME] = name.trim();
         this._config[Configuration.CONFIG_CONTEXT] = null;
-        this._config[Configuration.CONFIG_PROPERTY] = new AppSettingsPropertyManager();
+        this._config[Configuration.CONFIG_PROPERTY] = new AppSettingsPropertyManagerFactory();
         this._config[Configuration.CONFIG_RESOURCE] = new ResourceManager();
         this._config[Configuration.CONFIG_PERMISSION] = new PermissionManager();
         this._config[Configuration.CONFIG_AUTHORIATION_OPTIMISTIC] = false;

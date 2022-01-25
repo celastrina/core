@@ -39,24 +39,22 @@ class MockPropertyManagerFactory extends PropertyManagerFactory {
 		this.createPropertyManagerInvoked = false;
 		this.hasSampleProperty = false;
 	}
-	/**
-	 * @abstract
-	 * @return {PropertyManager}
-	 * @private
-	 */
-	_createPropertyManager(source) {
-		this.hasSampleProperty = source.hasOwnProperty("sample");
-		this.createPropertyManagerInvoked = true;
+	_create(azcontext) {
 		return new MockPropertyManager();
 	}
-	/**@type{string}*/getName() {return "MockPropertyManagerFactory";}
+	_load(azcontext, manager, source) {
+		this.hasSampleProperty = source.hasOwnProperty("sample");
+		this.createPropertyManagerInvoked = true;
+		return manager;
+	}
+	/**@type{string}*/get name() {return "MockPropertyManagerFactory";}
 }
 
 describe("PropertyManagerFactory", () => {
 	describe("#getName()", () => {
 		it("should return name", () => {
 			let _factory = new MockPropertyManagerFactory();
-			assert.strictEqual(_factory.getName(), "MockPropertyManagerFactory", "Expected 'MockPropertyManagerFactory'.");
+			assert.strictEqual(_factory.name, "MockPropertyManagerFactory", "Expected 'MockPropertyManagerFactory'.");
 		});
 	});
 	describe("#createPropertyManager()", () => {
