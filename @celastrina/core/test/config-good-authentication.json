@@ -1,21 +1,21 @@
 {
   "configurations": [
     {
-      "_content": {
-        "type": "application/vnd.celastrinajs.config+json;Core"
+      "$object": {
+        "contentType": "application/vnd.celastrinajs.config+json;Core"
       },
       "authentication": {
         "optimistic": true,
         "permissions": [
           {
-            "_content": {
-              "type": "application/vnd.celastrinajs.attribute+json;Permission",
+            "$object": {
+              "contentType": "application/vnd.celastrinajs.attribute+json;Permission",
               "version": "1.0.0"
             },
             "action": "mock-process-1",
             "roles": {
-              "_content": {
-                "type": "application/vnd.celastrinajs.attribute+json;Property",
+              "$object": {
+                "contentType": "application/vnd.celastrinajs.attribute+json;Property",
                 "version": "1.0.0"
               },
               "key": "mock_process-1-roles",
@@ -26,8 +26,8 @@
             }
           },
           {
-            "_content": {
-              "type": "application/vnd.celastrinajs.attribute+json;Permission"
+            "$object": {
+              "contentType": "application/vnd.celastrinajs.attribute+json;Permission"
             },
             "action": "mock-process-2",
             "roles": [
@@ -40,15 +40,15 @@
             }
           },
           {
-            "_content": {
-              "type": "application/vnd.celastrinajs.attribute+json;Property+Permission"
+            "$object": {
+              "contentType": "application/vnd.celastrinajs.attribute+json;Property+Permission"
             },
             "key": "mock_permission",
             "type": "object"
           },
           {
-            "_content": {
-              "type": "application/vnd.celastrinajs.attribute+json;Property+[Permission]",
+            "$object": {
+              "contentType": "application/vnd.celastrinajs.attribute+json;Property+[Permission]",
               "expand": true
             },
             "key": "mock_permission_expand",

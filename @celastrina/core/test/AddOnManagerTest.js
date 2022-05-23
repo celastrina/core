@@ -30,15 +30,15 @@ const {MockAddOn} = require("./ConfigurationTest");
 const {MockContext} = require("./ContextTest");
 
 class AddOnMockOne extends MockAddOn {
-	/**@type{string}*/static get addOnName() {return "AddOnMockOne";}
+	/**@type{Object}*/static get $object() {return {addOn: "AddOnMockOne"}};
 	constructor() {
 		super();
 	}
 }
 class AddOnMockTwo extends MockAddOn {
-	/**@type{string}*/static get addOnName() {return "AddOnMockTwo";}
+	/**@type{Object}*/static get $object() {return {addOn: "AddOnMockTwo"}};
 	constructor() {
-		super([AddOnMockOne.addOnName], [LifeCycle.STATE.LOAD, LifeCycle.STATE.SAVE]);
+		super([AddOnMockOne.$object.addOn], [LifeCycle.STATE.LOAD, LifeCycle.STATE.SAVE]);
 		this.doLifeCycleInvoked = false;
 		this.lifecyclesInvoked = [];
 	}
@@ -56,15 +56,15 @@ class AddOnMockTwo extends MockAddOn {
 	}
 }
 class AddOnMockThree extends MockAddOn {
-	/**@type{string}*/static get addOnName() {return "AddOnMockThree";}
+	/**@type{Object}*/static get $object() {return {addOn: "AddOnMockThree"}};
 	constructor() {
-		super([AddOnMockOne.addOnName]);
+		super([AddOnMockOne.$object.addOn]);
 	}
 }
 class AddOnMockFour extends MockAddOn {
-	/**@type{string}*/static get addOnName() {return "AddOnMockFour";}
+	/**@type{Object}*/static get $object() {return {addOn: "AddOnMockFour"}};
 	constructor() {
-		super([AddOnMockOne.addOnName, AddOnMockThree.addOnName]);
+		super([AddOnMockOne.$object.addOn, AddOnMockThree.$object.addOn]);
 	}
 }
 
