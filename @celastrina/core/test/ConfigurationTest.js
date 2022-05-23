@@ -32,7 +32,7 @@ const assert = require("assert");
 const fs = require("fs");
 
 class MockAddOn extends AddOn {
-    /**@type{string}*/static get addOnName() {return "MockAddOn";}
+    /**@return{Object}*/static get $object() {return {addOn: "MockAddOn"};}
     /***
      * @param {Array<string>} dependencies
      * @param {Array<number>} lifecycles
@@ -65,7 +65,7 @@ class MockAddOn extends AddOn {
     }
 }
 class MockAddOnTwo extends MockAddOn {
-    /**@type{string}*/static get addOnName() {return "MockAddOnTwo";}
+    /**@return{Object}*/static get $object() {return {addOn: "MockAddOnTwo"};}
     /***
      * @param {Array<string>} dependencies
      */
@@ -255,7 +255,7 @@ describe("Configuration", () => {
             process.env["IDENTITY_HEADER"] = "ThatsMyLuggage12345";
             _loader = new Configuration("ConfigurationTest", "mock_property");
             _pm = new MockPropertyManager();
-            _pm.mockProperty("mock_resources", "[{\"id\": \"mock-resource-1\", \"authority\": \"authority1\", \"tenant\":  \"tenant1\", \"secret\": \"secret1\"},{\"id\": \"mock-resource-2\", \"authority\": \"authority2\", \"tenant\":  \"tenant2\", \"secret\": \"secret2\"}]");
+            _pm.mockProperty("mock_resources", "[{\"id\": \"mock-resource-1\", \"authority\": \"authority1\", \"tenant\": \"tenant1\", \"secret\": \"secret1\"},{\"id\": \"mock-resource-2\", \"authority\": \"authority2\", \"tenant\":  \"tenant2\", \"secret\": \"secret2\"}]");
             _pm.mockProperty("mock_property", fs.readFileSync("./test/config-good-resources.json", "utf8"));
             _azcontext = new MockAzureFunctionContext();
         });

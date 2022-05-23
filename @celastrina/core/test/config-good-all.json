@@ -1,20 +1,24 @@
 {
   "configurations": [
     {
-      "_content": {"type": "application/vnd.celastrinajs.config+json;Core"},
+      "$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core#",
+                  "contentType": "application/vnd.celastrinajs.config+json;Core"},
       "properties": {
         "cache": {
           "ttl": 5,
           "unit": "minutes",
           "controls": [
-            {"_content": {"type": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+            {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/CacheProperty#",
+                         "contentType": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
               "key": "property-key-one",
               "ttl": 2,
               "unit": "minutes"},
-            {"_content": {"type": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+            {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/CacheProperty#",
+                         "contentType": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
               "key": "property-key-two",
               "noCache": true},
-            {"_content": {"type": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
+            {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/CacheProperty#",
+                         "contentType": "application/vnd.celastrinajs.attribute+json;CacheProperty"},
               "key": "property-key-three",
               "noExpire": true}]
         }
@@ -22,27 +26,32 @@
       "resources": {
         "identity": {
           "mappings": [
-            {"_content": {"type": "application/vnd.celastrinajs.attribute+json;PrincipalMapping"},
+            {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/PrincipalMapping#",
+                         "contentType": "application/vnd.celastrinajs.attribute+json;PrincipalMapping"},
               "principal": "mock_principal",
               "resource": "mock_resource"}]
         },
         "authorizations": {
-          "_content": {"type": "application/vnd.celastrinajs.attribute+json;Property+[AppRegistrationResource]"},
+          "$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/AppRegistrationResource#",
+                      "contentType": "application/vnd.celastrinajs.attribute+json;Property+[AppRegistrationResource]"},
           "key": "mock_resources",
           "type": "object"}
       },
       "authentication": {
         "optimistic": true,
         "permissions": [
-          {"_content": {"type": "application/vnd.celastrinajs.attribute+json;Permission", "version": "1.0.0"},
+          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Permission#",
+                       "contentType": "application/vnd.celastrinajs.attribute+json;Permission", "version": "1.0.0"},
             "action": "mock-process-1",
             "roles": {
-              "_content": {"type": "application/vnd.celastrinajs.attribute+json;Property", "version": "1.0.0"},
+              "$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Property#",
+                          "contentType": "application/vnd.celastrinajs.attribute+json;Property", "version": "1.0.0"},
               "key": "mock_process-1-roles",
               "type": "object"
             },
             "match": {"type": "MatchAny"}},
-          {"_content": {"type": "application/vnd.celastrinajs.attribute+json;Permission"},
+          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Permission#",
+                       "contentType": "application/vnd.celastrinajs.attribute+json;Permission"},
             "action": "mock-process-2",
             "roles": [
               "role-4",
@@ -50,13 +59,16 @@
               "role-6"
             ],
             "match": {"type": "MatchAll"}},
-          {"_content": {"type": "application/vnd.celastrinajs.attribute+json;Property+Permission"},
+          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Permission#",
+                       "contentType": "application/vnd.celastrinajs.attribute+json;Property+Permission"},
             "key": "mock_permission",
             "type": "object"},
-          {"_content": {"type": "application/vnd.celastrinajs.attribute+json;Property+[Permission]", "expand": true},
+          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Permission#",
+                       "contentType": "application/vnd.celastrinajs.attribute+json;Property+[Permission]", "expand": true},
             "key": "mock_permission_expand",
             "type": "object"}],
-        "roleFactory": {"_content": {"type": "application/vnd.celastrinajs.attribute+json;RoleFactory"}}
+        "roleFactory": {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/RoleFactory#",
+                                    "contentType": "application/vnd.celastrinajs.attribute+json;RoleFactory"}}
       }
     }
   ]
