@@ -70,6 +70,19 @@ const DEFAULT_TIMEOUT = 5000;
  * @type {{TRACE: number, ERROR: number, VERBOSE: number, INFO: number, WARN: number, THREAT: number}}
  */
 const LOG_LEVEL = {TRACE: 0, VERBOSE: 1, INFO: 2, WARN: 3, ERROR: 4, THREAT: 5};
+function _getSchema(_target, isInstance = true) {
+    let _schema = ((isInstance) ?  _target.constructor.$object : _target.$object);
+    if(typeof _schema === "undefined" || _schema == null) return null;
+    else return _schema;
+}
+function _getType(_target, isInstance = true) {
+    let _schema = _getSchema(_target, isInstance);
+    if(_schema == null) return null;
+    else if(_schema.hasOwnProperty("type") && typeof _schema.type === "string" && _schema.type.trim().length > 0)
+        return _schema.type;
+    else
+        return null;
+}
 /**
  * @brief Used to type-safe-check across node packages.
  * @description Uses static get attribute <code>static get celastrinaType</code> method to get the type string. Use this
@@ -80,15 +93,15 @@ const LOG_LEVEL = {TRACE: 0, VERBOSE: 1, INFO: 2, WARN: 3, ERROR: 4, THREAT: 5};
  */
 function instanceOfCelastrinaType(_class, _object) {
     if(((typeof _class === "undefined" || _class === null)) || ((typeof _object !== "object") || _object == null)) return false;
-    let _otype = _object.constructor.celastrinaType;
-    let _ctype = _class.celastrinaType;
-    if((typeof _otype !== "string") || (typeof _ctype !== "string")) return false;
-    let _target = _object.constructor;
+    let _ctype = _getType(_class, false);
+    if((typeof _ctype !== "string")) return false;
+    let _target = _object;
+    let _otype = null;
     do {
+        _otype =  _getType(_target);
         if(_otype === _ctype) return true;
         _target = _target.__proto__;
-        _otype = _target.celastrinaType;
-    } while(typeof _otype !== "undefined");
+    } while(_target != null)
     return false;
 }
 /**
@@ -110,7 +123,8 @@ function getDefaultTimeout(_default_ = DEFAULT_TIMEOUT) {
  * @author Robert R Murrell
  */
 class CelastrinaError extends Error {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CelastrinaError";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CelastrinaError#",
+                                                      type: "celastrinajs.core.CelastrinaError"}};
     /**
      * @param {string} message
      * @param {int} code
@@ -124,7 +138,6 @@ class CelastrinaError extends Error {
         /**@type{number}*/this.code = code;
         /**@type{boolean}*/this.drop = drop;
     }
-
     /**@return {string}*/toString() {
         return "[" + this.name + "][" + this.code + "][" + this.drop + "]: " + this.message;
     }
@@ -163,7 +176,8 @@ class CelastrinaError extends Error {
  * @author Robert R Murrell
  */
 class CelastrinaValidationError extends CelastrinaError {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CelastrinaValidationError";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CelastrinaValidationError#",
+                                                      type: "celastrinajs.core.CelastrinaValidationError"}};
     /**
      * @param {string} message
      * @param {int} code
@@ -215,7 +229,8 @@ class CelastrinaValidationError extends CelastrinaError {
  * @author Robert R Murrell
  */
 class CelastrinaEvent {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CelastrinaEvent";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CelastrinaEvent#",
+                                                      type: "celastrinajs.core.CelastrinaEvent"}};
     /**
      * @param {Context} context
      * @param {*} [source=null]
@@ -250,7 +265,8 @@ class CelastrinaEvent {
  * @abstract
  */
 class ResourceAuthorization {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ResourceAuthorization";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ResourceAuthorization#",
+                                                      type: "celastrinajs.core.ResourceAuthorization"}};
     /**
      * @param {string} id
      * @param {number} [skew=0]
@@ -323,7 +339,8 @@ class ResourceAuthorization {
  * @author Robert R Murrell
  */
 class ManagedIdentityResource extends ResourceAuthorization {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ManagedIdentityResource";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ManagedIdentityResource#",
+                                                      type: "celastrinajs.core.identity.managed"}};
     /**@type{string}*/static MANAGED_IDENTITY = "celastrinajs.core.identity.managed";
     /**
      * @param {boolean}[stripDefaultRoleIdentifier=true]
@@ -422,7 +439,8 @@ class ManagedIdentityResource extends ResourceAuthorization {
  * @author Robert R Murrell
  */
 class AppRegistrationResource extends ResourceAuthorization {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppRegistrationResource";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AppRegistrationResource#",
+                                                      type: "celastrinajs.core.AppRegistrationResource"}};
     /**
      * @param {string} id
      * @param {string} authority
@@ -475,7 +493,8 @@ class AppRegistrationResource extends ResourceAuthorization {
  * @author Robert R Murrell
  */
 class ResourceManagerTokenCredential {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ResourceManagerTokenCredential";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ResourceManagerTokenCredential#",
+                                                      type: "celastrinajs.core.ResourceManagerTokenCredential"}};
     /**
      * @param {ResourceAuthorization} ra
      */
@@ -505,7 +524,8 @@ class ResourceManagerTokenCredential {
  * @author Robert R Murrell
  */
 class ResourceManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ResourceManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ResourceManager#",
+                                                      type: "celastrinajs.core.ResourceManager"}};
     /**
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
@@ -592,7 +612,8 @@ class ResourceManager {
  * @author Robert R Murrell
  */
 class Vault {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Vault";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Vault#",
+                                                      type: "celastrinajs.core.Vault"}};
     /**
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
@@ -633,7 +654,8 @@ class Vault {
  * @author Robert R Murrell
  */
 class PropertyManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PropertyManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/PropertyManager#",
+                                                      type: "celastrinajs.core.PropertyManager"}};
     constructor(){}
     /**
      * @param {_AzureFunctionContext} azcontext
@@ -798,7 +820,8 @@ class PropertyManager {
  * @property {(null|string)} [_vaultResource=null]
  */
 class AppSettingsPropertyManager extends PropertyManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AppSettingsPropertyManager#",
+                                                      type: "celastrinajs.core.AppSettingsPropertyManager"}};
     /**
      * @param {boolean} [followVaultReference=true]
      * @param {string} [vaultResource=ManagedIdentityResource.MANAGED_IDENTITY]
@@ -916,7 +939,8 @@ class AppSettingsPropertyManager extends PropertyManager {
  * @author Robert R Murrell
  */
 class AppConfigPropertyManager extends AppSettingsPropertyManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppConfigPropertyManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AppConfigPropertyManager#",
+                                                      type: "celastrinajs.core.AppConfigPropertyManager"}};
     /**
      * @param {(null|string)} [configStore=null]
      * @param {string} [propResource=ManagedIdentityResource.MANAGED_IDENTITY]
@@ -1055,7 +1079,8 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
  * @author Robert R Murrell
  */
 class CacheProperty {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CacheProperty";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CacheProperty#",
+                                                      type: "celastrinajs.core.CacheProperty"}};
     /**
      * @param {*} [value = null]
      * @param {boolean} [cache = true]
@@ -1128,7 +1153,8 @@ class CacheProperty {
  * @author Robert R Murrell
  */
 class CachedPropertyManager extends PropertyManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CachedPropertyManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CachedPropertyManager#",
+                                                      type: "celastrinajs.core.CachedPropertyManager"}};
     /**
      * @param {PropertyManager} [manager=new AppSettingsPropertyManager()]
      * @param {number} [defaultTime=5]
@@ -1329,7 +1355,8 @@ class CachedPropertyManager extends PropertyManager {
  * @author Robert R Murrell
  */
 class PropertyManagerFactory {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PropertyManagerFactory";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/PropertyManagerFactory#",
+                                                      type: "celastrinajs.core.PropertyManagerFactory"}};
     /**
      * @param {(null|string)}[_property=null]
      * @param {boolean} [optional=false]
@@ -1430,7 +1457,8 @@ class PropertyManagerFactory {
  * @author Robert R Murrell
  */
 class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppSettingsPropertyManagerFactory";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AppSettingsPropertyManagerFactory#",
+                                                      type: "celastrinajs.core.AppSettingsPropertyManagerFactory"}};
     static PROP_USE_APP_SETTINGS = "celastrinajs.core.property.appsettings.config";
     constructor(property = AppSettingsPropertyManagerFactory.PROP_USE_APP_SETTINGS) {
         super(property, true);
@@ -1472,7 +1500,8 @@ class AppSettingsPropertyManagerFactory extends PropertyManagerFactory {
  * @author Robert R Murrell
  */
 class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppConfigPropertyManagerFactory";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AppConfigPropertyManagerFactory#",
+                                                      type: "celastrinajs.core.AppConfigPropertyManagerFactory"}};
     static PROP_USE_APP_CONFIG = "celastrinajs.core.property.appconfig.config";
     constructor(property = AppConfigPropertyManagerFactory.PROP_USE_APP_CONFIG) {
         super(property, false);
@@ -1527,7 +1556,8 @@ class AppConfigPropertyManagerFactory extends PropertyManagerFactory {
  * @abstract
  */
 class ParserChain {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ParserChain";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ParserChain#",
+                                                      type: "celastrinajs.core.ParserChain"}};
     /**
      * @param {string} [mime="application/celastrinajs+json"]
      * @param {string} [type="Object"]
@@ -1583,24 +1613,24 @@ class ParserChain {
             throw CelastrinaValidationError.newValidationError(
                 "[ParserChain.parse(_Object, config)][_Object]: Invalid argument. Argument cannot be 'undefined' or null.",
                 "_Object");
-        if(!_Object.hasOwnProperty("_content") || _Object._content == null)
+        if(!_Object.hasOwnProperty("$object") || _Object.$object == null)
             throw CelastrinaValidationError.newValidationError(
-                "[ParserChain.parse(_Object, config)][_content]: Invalid object. Attribute cannot be undefined or null.",
-                "_Object._content");
-        let _content = _Object._content;
-        if(!_content.hasOwnProperty("type") || (typeof _content.type !== "string") || _content.type.trim().length === 0)
+                "[ParserChain.parse(_Object, config)][$object]: Invalid object. Attribute cannot be undefined or null.",
+                "_Object.$object");
+        let _schema = _Object.$object;
+        if(!_schema.hasOwnProperty("contentType") || (typeof _schema.contentType !== "string") || _schema.contentType.trim().length === 0)
             throw CelastrinaValidationError.newValidationError(
-                "[ParserChain.parse(_Object, config)][_content.type]: Invalid string. Attribute cannot be null or zero length.",
-                "_Object._content.type");
+                "[ParserChain.parse(_Object, config)][_schema.contentType]: Invalid string. Attribute cannot be null or zero length.",
+                "_Object._schema.contentType");
         let _versioned = false;
-        if(_content.hasOwnProperty("version")) {
-            if((typeof _content.version !== "string") || _content.version.trim().length === 0)
+        if(_schema.hasOwnProperty("version")) {
+            if((typeof _schema.version !== "string") || _schema.version.trim().length === 0)
                 throw CelastrinaValidationError.newValidationError(
-                    "[ParserChain.parse(_Object, config)][_content.version]: Invalid string. Attribute cannot be null or zero length.",
-                    "_Object._content.version");
+                    "[ParserChain.parse(_Object, config)][_schema.version]: Invalid string. Attribute cannot be null or zero length.",
+                        "_Object._schema.version");
             _versioned = true;
         }
-        let _types = _Object._content.type.trim();
+        let _types = _schema.contentType.trim();
         _types = _types.split(" ").join("");
         _types = _types.split(";");
         let _mime = _types[0];
@@ -1608,20 +1638,20 @@ class ParserChain {
         let _subtypes = _type.split("+");
         /**@type{*}*/let _target = _Object;
         if(_mime === this._mime) {
-            if(_versioned && _Object._content.version !== this._version)
+            if(_versioned && _schema.version !== this._version)
                 throw CelastrinaValidationError.newValidationError(
-                    "[ParserChain.parse(_Object, config)][_content.version]: Unsupported version. Expected '" +
-                    this._version + "', but got '" + _Object._content.version + "'.",
-                    "_content.version");
+                    "[ParserChain.parse(_Object, config)][_schema.version]: Unsupported version. Expected '" +
+                    this._version + "', but got '" + _schema.version + "'.",
+                    "_schema.version");
             for (let _subtype of _subtypes) {
                 if((typeof _target !== "undefined") && _target != null) {
                     let _expand = false;
                     if (_subtype.startsWith("[")) {
                         if (!_subtype.endsWith("]"))
                             throw CelastrinaValidationError.newValidationError(
-                                "[ParserChain.parse(_Object, config)][_content.version]: Invalid subtype. Sub-type '" + _subtype +
+                                "[ParserChain.parse(_Object, config)][_schema.version]: Invalid subtype. Sub-type '" + _subtype +
                                 "' indicated an array opening with '[' but is missing closing ']'.",
-                                "_content.type+subtype");
+                                "_schema.type+subtype");
                         else {
                             _expand = true;
                             _subtype = _subtype.substring(1);
@@ -1629,9 +1659,9 @@ class ParserChain {
                         }
                     } else if (_subtype.endsWith("]"))
                         throw CelastrinaValidationError.newValidationError(
-                            "[ParserChain.parse(_Object, config)][_content.version]: Invalid subtype. Sub-type '" + _subtype +
+                            "[ParserChain.parse(_Object, config)][_schema.version]: Invalid subtype. Sub-type '" + _subtype +
                             "' indicated an array closing with ']' but is missing opening '['.",
-                            "_content.type+subtype");
+                            "_schema.type+subtype");
                     _target = await this._parse(_subtype, _target, _expand);
                 }
             }
@@ -1671,7 +1701,7 @@ class ParserChain {
             return _Object;
     }
     /**
-     * @param {{_content:{type:string,version?:string}}} _Object
+     * @param {{$object:{type:string,version?:string}}} _Object
      * @return {Promise<*>}
      * @abstract
      */
@@ -1685,8 +1715,9 @@ class ParserChain {
  * @author Robert R Murrell
  */
 class AttributeParser extends ParserChain {
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AttributeParser#",
+                                                      type: "celastrinajs.core.AttributeParser"}};
     static _CONFIG_PARSER_ATTRIBUTE_TYPE = "application/vnd.celastrinajs.attribute+json";
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AttributeParser";}
     /**
      * @param {string} [type="Object"]
      * @param {AttributeParser} [link=null]
@@ -1701,7 +1732,8 @@ class AttributeParser extends ParserChain {
  * @author Robert R Murrell
  */
 class PropertyParser extends AttributeParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PropertyParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/PropertyParser#",
+                                                      type: "celastrinajs.core.PropertyParser"}};
     /**
      * @param {AttributeParser} link
      * @param {string} version
@@ -1739,7 +1771,8 @@ class PropertyParser extends AttributeParser {
  * @author Robert R Murrell
  */
 class PermissionParser extends AttributeParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PermissionParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/PermissionParser#",
+                                                      type: "celastrinajs.core.PermissionParser"}};
     /**
      * @param {string} version
      * @param {AttributeParser} link
@@ -1802,7 +1835,8 @@ class PermissionParser extends AttributeParser {
  * @author Robert R Murrell
  */
 class AppRegistrationResourceParser extends AttributeParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AppRegistrationResourceParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AppRegistrationResourceParser#",
+                                                      type: "celastrinajs.core.AppRegistrationResourceParser"}};
     /**
      * @param {AttributeParser} link
      * @param {string} version
@@ -1844,7 +1878,8 @@ class AppRegistrationResourceParser extends AttributeParser {
  * @author Robert R Murrell
  */
 class RoleFactoryParser extends AttributeParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.RoleFactoryParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/RoleFactoryParser#",
+                                                      type: "celastrinajs.core.RoleFactoryParser"}};
     /**
      * @param {AttributeParser} [link=null]
      * @param {string} [type="RoleFactory"]
@@ -1866,7 +1901,8 @@ class RoleFactoryParser extends AttributeParser {
  * @author Robert R Murrell
  */
 class PrincipalMappingParser extends AttributeParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PrincipalMappingParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/PrincipalMappingParser#",
+                                                      type: "celastrinajs.core.PrincipalMappingParser"}};
     /**
      * @param {AttributeParser} link
      * @param {string} [type="PrincipalMapping"]
@@ -1894,7 +1930,8 @@ class PrincipalMappingParser extends AttributeParser {
  * @author Robert R Murrell
  */
 class CachePropertyParser extends AttributeParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CachePropertyParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CachePropertyParser#",
+                                                      type: "celastrinajs.core.CachePropertyParser"}};
     /**
      * @param {AttributeParser} link
      * @param {string} [type="PrincipalMapping"]
@@ -1936,8 +1973,9 @@ class CachePropertyParser extends AttributeParser {
  * @abstract
  */
 class ConfigParser extends ParserChain {
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ConfigParser#",
+                                                      type: "celastrinajs.core.ConfigParser"}};
     static _CONFIG_PARSER_TYPE = "application/vnd.celastrinajs.config+json";
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ConfigParser";}
     /**
      * @param {string} [type="Config"]
      * @param {ConfigParser} [link=null]
@@ -1952,7 +1990,8 @@ class ConfigParser extends ParserChain {
  * @author Robert R Murrell
  */
 class CoreConfigParser extends ConfigParser {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CoreConfigParser";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CoreConfigParser#",
+                                                      type: "celastrinajs.core.CoreConfigParser"}};
     /**
      * @param {ConfigParser} [link=null]
      * @param {string} [version="1.0.0"]
@@ -2106,8 +2145,9 @@ class CoreConfigParser extends ConfigParser {
  * @abstract
  */
 class AddOn {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AddOn";}
-    /**@return{string}*/static get addOnName() {return "celastrinajs.core.AddOn";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AddOn#",
+                                                      type: "celastrinajs.core.AddOn",
+                                                      addOn: "celastrinajs.core.AddOn"}};
     /**
      * @param {Array<string>} [dependencies=[]]
      * @param {Array<number>} [lifecycles=[]]
@@ -2132,7 +2172,8 @@ class AddOn {
  * @author Robert R Murrell
  */
 class LifeCycle {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.LifeCycle";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/LifeCycle#",
+                                                      type: "celastrinajs.core.LifeCycle"}};
     /**@return{string}*/static get version() {return "1.0.0";}
     /**
      * @type {{AUTHENTICATE: number, TERMINATE: number, INITIALIZE: number, AUTHORIZE: number, LOAD: number,
@@ -2158,13 +2199,22 @@ class LifeCycle {
     /**@return{number}*/get lifecycle() {return this._lifecycle;}
     /**@return{*}*/get exception() {return this._exception;}
 }
+function _getAddOn(addOn) {
+    let _schema = _getSchema(addOn, true);
+    if(_schema == null) throw CelastrinaError.newError("Object '" + addOn.constructor.name + "' is not an AddOn.");
+    else if(_schema.hasOwnProperty("addOn") && typeof _schema.addOn === "string" && _schema.addOn.trim().length > 0)
+        return _schema.addOn;
+    else
+        throw CelastrinaError.newError("Object '" + addOn.constructor.name + "' is not an AddOn.");
+}
 /**
  * AddOnManager
  * @author Robert R Murrell
  * @private
  */
 class AddOnManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AddOnManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AddOnManager#",
+                                                      type: "celastrinajs.core.AddOnManager"}};
     static NOT_FOUND = -1;
     constructor() {
         /**@type{Object}*/this._addons = {};
@@ -2178,7 +2228,7 @@ class AddOnManager {
     _indexOf(name, start = 0) {
         for(let i = start; i < this._target.length; ++i) {
             let _addon = this._target[i];
-            if(name === _addon.constructor.addOnName) return i;
+            if(name === _getAddOn(_addon)) return i;
         }
         return AddOnManager.NOT_FOUND;
     }
@@ -2195,23 +2245,25 @@ class AddOnManager {
      */
     add(addon) {
         if(this._ready) throw CelastrinaError.newError("Invalid state, AddOnManager alread installed.");
-        this._addons[addon.constructor.addOnName] = addon;
+        if(!instanceOfCelastrinaType(AddOn, addon)) throw CelastrinaError.newError("Object '" + addon.constructor.name + "' is not an AddOn.");
+        this._addons[_getAddOn(addon)] = addon;
         if(addon.dependancies.size === 0) this._target.unshift(addon);
         else if(this._target.length > 0 && this._allResolved(addon)) {
             this._target.push(addon);
-            this._unresolved.delete(addon.constructor.addOnName);
+            this._unresolved.delete(addon.constructor.$object.addOn);
         }
         else {
             if(addon.dependancies.size > this._depth) this._depth = addon.dependancies.size;
-            this._unresolved.set(addon.constructor.addOnName, addon);
+            this._unresolved.set(addon.constructor.$object.addOn, addon);
         }
     }
     /**
+     * @brief Gets an addOn by its class name, or its class type.
      * @param {(string|Class<AddOn>)} addon
      */
     get(addon) {
         /**@type{string}*/let _name;
-        (typeof addon === "string") ? _name = addon : _name = addon.addOnName;
+        (typeof addon === "string") ? _name = addon : _name = addon.$object.addOn;
         let _addon = this._addons[_name];
         if(typeof _addon === "undefined") return null;
         else return _addon;
@@ -2220,8 +2272,7 @@ class AddOnManager {
      * @param {(string|Class<AddOn>)} addon
      */
     has(addon) {
-        /**@type{string}*/let _name;
-        (typeof addon === "string") ? _name = addon : _name = addon.addOnName;
+        /**@type{string}*/let _name = ((typeof addon === "string") ? addon : addon.$object.addOn);
         return (this._addons.hasOwnProperty(_name));
     }
     /**
@@ -2262,7 +2313,7 @@ class AddOnManager {
             if(this._unresolved.size > 0) {
                 let _sunrslvd = this._unresolved.size + " unresolved Add-On(s):\r\n";
                 for(let _addon of this._unresolved.values()) {
-                    _sunrslvd += "\tAdd-On '" + _addon.constructor.addOnName + "' could not resolve depentent(s):\r\n"
+                    _sunrslvd += "\tAdd-On '" + _addon.constructor.$object.addOn + "' could not resolve depentent(s):\r\n"
                     for(let _dep of _addon.dependancies) {
                         _sunrslvd += "\t\t Add-On '" + _dep + "'\r\n";
                     }
@@ -2274,7 +2325,7 @@ class AddOnManager {
             else {
                 for(/**@type{(AddOn|{constructor})}*/let _addon of this._target) {
                     azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On " +
-                        _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
+                        _addon.constructor.name + ":" + _addon.constructor.$object.addOn + ".");
                     if(parse) {
                         let _acfp = _addon.getConfigParser();
                         if(_acfp != null) cfp.addLink(_acfp);
@@ -2307,7 +2358,7 @@ class AddOnManager {
             let _promises = [];
             for(/**@type{(AddOn|{constructor})}*/let _addon of this._target) {
                 azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On " +
-                    _addon.constructor.name + ":" + _addon.constructor.addOnName + ".");
+                    _addon.constructor.name + ":" + _addon.constructor.$object.addOn + ".");
                 _promises.push(_addon.initialize(azcontext, config));
             }
             await Promise.all(_promises);
@@ -2332,7 +2383,8 @@ class AddOnManager {
  * @author Robert R Murrell
  */
 class Configuration {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Configuration";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Configuration#",
+                                                      type: "celastrinajs.core.Configuration"}};
     /**@type{string}*/static CONFIG_NAME    = "celastrinajs.core.name";
     /**@type{string}*/static CONFIG_CONTEXT = "celastrinajs.core.context";
     /**@type{string}*/static CONFIG_PROPERTY = "celastrinajs.core.property.manager";
@@ -2486,7 +2538,7 @@ class Configuration {
     addOn(addon) {
         if(!instanceOfCelastrinaType(AddOn, addon))
             throw CelastrinaValidationError.newValidationError("Argument 'addon' is required and must be of type '" +
-                AddOn.celastrinaType + "'.", "addon");
+                AddOn.$object.type + "'.", "addon");
         this._addons.add(addon);
         return this;
     }
@@ -2521,7 +2573,7 @@ class Configuration {
     /**
      * @param {AttributeParser} parser
      * @param {Object} _Object
-     * @param {Object|{_content?:{expand?:true}}} _value
+     * @param {Object|{$object?:{expand?:true}}} _value
      * @param {*} _prop
      * @return {Promise<void>}
      */
@@ -2530,8 +2582,8 @@ class Configuration {
         if(typeof _lvalue === "undefined" || _lvalue == null)
             _Object[_prop] = null;
         else {
-            if(Array.isArray(_lvalue) && Array.isArray(_Object) && _value._content.hasOwnProperty("expand") &&
-                    (typeof _value._content.expand === "boolean") && _value._content.expand) {
+            if(Array.isArray(_lvalue) && Array.isArray(_Object) && _value.$object.hasOwnProperty("expand") &&
+                    (typeof _value.$object.expand === "boolean") && _value.$object.expand) {
                 _Object.splice(_prop, 1, ..._lvalue);
             }
             else
@@ -2546,11 +2598,11 @@ class Configuration {
     static async _parseProperties(parser, _object) {
         for(let prop in _object) {
             if(_object.hasOwnProperty(prop)) {
-                if(prop !== "_content") {
+                if(prop !== "$object") {
                     let value = _object[prop];
                     if(typeof value === "object" && value != null) {
-                        if(value.hasOwnProperty("_content") && (typeof value._content === "object") &&
-                            value._content != null) {
+                        if(value.hasOwnProperty("$object") && (typeof value.$object === "object") &&
+                            value.$object != null) {
                             await this._parseProperties(parser, value);
                             await Configuration._replace(parser, _object, value, prop);
                         }
@@ -2793,7 +2845,8 @@ class Configuration {
  * @abstract
  */
 class Algorithm {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Algorithm";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Algorithm#",
+                                                      type: "celastrinajs.core.Algorithm"}};
     /**
      * @param {string} name
      */
@@ -2812,7 +2865,8 @@ class Algorithm {
 }
 /**@type{Algorithm}*/
 class AES256Algorithm extends Algorithm {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.AES256Algorithm";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AES256Algorithm#",
+                                                      type: "celastrinajs.core.AES256Algorithm"}};
     /**
      * @param {string} key
      * @param {string} iv
@@ -2857,7 +2911,8 @@ class AES256Algorithm extends Algorithm {
  * @author Robert R Murrell
  */
 class Cryptography {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Cryptography";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Cryptography#",
+                                                      type: "celastrinajs.core.Cryptography"}};
     /**@param{Algorithm}algorithm*/
     constructor(algorithm) {
         this._algorithm = algorithm;
@@ -2904,7 +2959,8 @@ class Cryptography {
  * @author Robert R Murrell
  */
 class MonitorResponse {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.MonitorResponse";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/MonitorResponse#",
+                                                      type: "celastrinajs.core.MonitorResponse"}};
     constructor() {
         this._passed = {};
         this._failed = {};
@@ -2937,7 +2993,8 @@ class MonitorResponse {
  * @author Robert R Murrell
  */
 class ValueMatch {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.ValueMatch";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/ValueMatch#",
+                                                      type: "celastrinajs.core.ValueMatch"}};
     /**
      * @brief
      * @param {string} [type]
@@ -2961,7 +3018,8 @@ class ValueMatch {
  * @author Robert R Murrell
  */
 class MatchAny extends ValueMatch {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.MatchAny";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/MatchAny#",
+                                                      type: "celastrinajs.core.MatchAny"}};
     constructor(){super("MatchAny");}
     /**
      * @brief A role in assertion can match a role in values and pass.
@@ -2982,7 +3040,8 @@ class MatchAny extends ValueMatch {
  * @author Robert R Murrell
  */
 class MatchAll extends ValueMatch {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.MatchAll";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/MatchAll#",
+                                                      type: "celastrinajs.core.MatchAll"}};
     constructor(){super("MatchAll");}
     /**
      * @brief All roles in assertion must match all roles in values.
@@ -3003,7 +3062,9 @@ class MatchAll extends ValueMatch {
  * @author Robert R Murrell
  */
 class MatchNone extends ValueMatch {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.MatchNone";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/MatchNone#",
+                                                      type: "celastrinajs.core.MatchNone"}};
+    /**@type{Object}*/ static $object = {type: "celastrinajs.core.MatchNone"};
     constructor(){super("MatchNone");}
     /**
      * @param {Set<string>} assertion
@@ -3023,7 +3084,8 @@ class MatchNone extends ValueMatch {
  * @author Robert R Murrell
  */
 class Permission {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Permission";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Permission#",
+                                                      type: "celastrinajs.core.Permission"}};
     /**
      * @param {string} action
      * @param {(Array<string>|Set<string>)} assignments
@@ -3064,7 +3126,8 @@ class Permission {
  * @author Robert R Murrell
  */
 class PermissionManager {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.PermissionManager";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/PermissionManager#",
+                                                      type: "celastrinajs.core.PermissionManager"}};
     constructor() {
         /**@type{Object}*/this._permissions = {};
     }
@@ -3105,7 +3168,8 @@ class PermissionManager {
  * @author Robert R Murrell
  */
 class RoleFactory {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.RoleFactory";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/RoleFactory#",
+                                                      type: "celastrinajs.core.RoleFactory"}};
     constructor() {}
     /**
      * @param {Context} context
@@ -3135,7 +3199,8 @@ class RoleFactory {
  * @author Robert R Murrell
  */
 class DefaultRoleFactory extends RoleFactory {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.DefaultRoleFactory";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/DefaultRoleFactory#",
+                                                      type: "celastrinajs.core.DefaultRoleFactory"}};
     constructor() {super()}
     /**
      * @param {Context} context
@@ -3149,7 +3214,8 @@ class DefaultRoleFactory extends RoleFactory {
  * @author Robert R Murrell
  */
 class Subject {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Subject";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Subject#",
+                                                      type: "celastrinajs.core.Subject"}};
     /**
      * @param {string} id
      * @param {Array<string>} [roles=[]]
@@ -3249,7 +3315,8 @@ class Subject {
  * @author Robert R Murrell
  */
 class Assertion {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Assertion";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Assertion#",
+                                                      type: "celastrinajs.core.Assertion"}};
     /**
      * @param {Context} context
      * @param {Subject} subject
@@ -3333,7 +3400,8 @@ class Assertion {
  * @abstract
  */
 class Authenticator {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Authenticator";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Authenticator#",
+                                                      type: "celastrinajs.core.Authenticator"}};
     /**
      * @param {string} [name="Authenticator"]
      * @param {boolean} [required=false]
@@ -3381,7 +3449,8 @@ class Authenticator {
  * @authro Robert R Murrell
  */
 class Authorizer {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Authorizer";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Authorizer#",
+                                                      type: "celastrinajs.core.Authorizer"}};
     /**
      * @param {string} [name="Authorizer"]
      * @param {boolean} [required=false]
@@ -3435,7 +3504,8 @@ class Authorizer {
  * @author Robert R Murrell
  */
 class Sentry {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Sentry";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Sentry#",
+                                                      type: "celastrinajs.core.Sentry"}};
     /**
      * @param {number} [timeout=DEFAULT_TIMEOUT]
      */
@@ -3535,7 +3605,8 @@ class Sentry {
  * @author Robert R Murrell
  */
 class Context {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.Context";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/Context#",
+                                                      type: "celastrinajs.core.Context"}};
     /**
      * @param {Configuration} config
      */
@@ -3655,7 +3726,8 @@ class Context {
  * @abstract
  */
 class CelastrinaFunction {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.CelastrinaFunction";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CelastrinaFunction#",
+                                                      type: "celastrinajs.core.CelastrinaFunction"}};
     constructor(configuration) {}
     /**
      * @param {Configuration} config
@@ -3725,7 +3797,8 @@ class CelastrinaFunction {
  * @author Robert R Murrell
  */
 class BaseFunction extends CelastrinaFunction {
-    /**@return{string}*/static get celastrinaType() {return "celastrinajs.core.BaseFunction";}
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/BaseFunction#",
+                                                      type: "celastrinajs.core.BaseFunction"}};
     /**@param{Configuration}configuration*/
     constructor(configuration) {
         super();

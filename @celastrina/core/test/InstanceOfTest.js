@@ -25,11 +25,11 @@ const {instanceOfCelastrinaType} = require("../Core");
 const assert = require("assert");
 
 class MockTypeA {
-    static get celastrinaType() {return "MockTypeA";}
+    /**@return{Object}*/static get $object() {return {type: "MockTypeA"};}
     constructor() {}
 }
 class MockTypeB {
-    static get celastrinaType() {return "MockTypeB";}
+    /**@return{Object}*/static get $object() {return {type: "MockTypeB"};}
     constructor() {}
 }
 class MockTypeC {

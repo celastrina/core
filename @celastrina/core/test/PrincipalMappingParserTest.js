@@ -5,7 +5,7 @@ describe("PrincipalMappingParser", () => {
 	describe("#_create(_PrincipalMapping)", () => {
 		it("should create principal mapping object", async () => {
 			let _PrincipalMappingParser = {
-				_content: {type: "application/vnd.celastrinajs.attribute+json;PrincipalMapping"},
+				$object: {contentType: "application/vnd.celastrinajs.attribute+json;PrincipalMapping"},
 				principal: "mock_principal",
 				resource: "mock_resource"
 			};
