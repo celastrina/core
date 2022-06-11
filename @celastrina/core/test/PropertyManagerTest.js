@@ -109,15 +109,29 @@ describe("AppSettingsPropertyManager", () => {
         });
     });
     describe("#initialize(azcontext, config)", () => {
-        let _azcontext = new MockAzureFunctionContext();
-        it("Does not reject", () => {
-            assert.doesNotReject(_pm.initialize(_azcontext, {}));
+        it("Does not reject", async () => {
+            let _azcontext = new MockAzureFunctionContext();
+            await assert.doesNotReject(_pm.initialize(_azcontext, {}));
+        });
+        it("Sets principal ID from override", async () => {
+            let _azcontext = new MockAzureFunctionContext();
+            process.env[Configuration.PROP_CONFIG_MI_OVERRIDE] = "mock_uim_override_value";
+            await assert.doesNotReject(_pm.initialize(_azcontext, {}));
+            assert.deepStrictEqual(_pm._tokenOptions, {principalId: "mock_uim_override_value"}, "Expected a principalId.");
         });
     });
     describe("#ready(azcontext, config)", () => {
-        let _azcontext = new MockAzureFunctionContext();
-        it("Does not reject", () => {
-            assert.doesNotReject(_pm.ready(_azcontext, {}));
+        it("Does not reject", async () => {
+            let _azcontext = new MockAzureFunctionContext();
+            await assert.doesNotReject(_pm.ready(_azcontext, {}));
+        });
+        it("Does not reject and clears principalId", async () => {
+            let _azcontext = new MockAzureFunctionContext();
+            process.env[Configuration.PROP_CONFIG_MI_OVERRIDE] = "mock_uim_override_value";
+            await assert.doesNotReject(_pm.initialize(_azcontext, {}));
+            assert.deepStrictEqual(_pm._tokenOptions, {principalId: "mock_uim_override_value"}, "Expected a principalId.");
+            await assert.doesNotReject(_pm.ready(_azcontext, {}));
+            assert.strictEqual(_pm._tokenOptions == null, true, "Expected a true.");
         });
     });
     describe("#getProperty(key, defaultValue = null)", () => {
