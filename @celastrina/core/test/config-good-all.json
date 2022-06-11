@@ -32,7 +32,7 @@
               "resource": "mock_resource"}]
         },
         "authorizations": {
-          "$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/AppRegistrationResource#",
+          "$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Property#",
                       "contentType": "application/vnd.celastrinajs.attribute+json;Property+[AppRegistrationResource]"},
           "key": "mock_resources",
           "type": "object"}
@@ -59,11 +59,11 @@
               "role-6"
             ],
             "match": {"type": "MatchAll"}},
-          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Permission#",
+          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Property#",
                        "contentType": "application/vnd.celastrinajs.attribute+json;Property+Permission"},
             "key": "mock_permission",
             "type": "object"},
-          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Permission#",
+          {"$object": {"schema": "https://celastrinajs.com/schema/v1.0.0/config/Core/Property#",
                        "contentType": "application/vnd.celastrinajs.attribute+json;Property+[Permission]", "expand": true},
             "key": "mock_permission_expand",
             "type": "object"}],

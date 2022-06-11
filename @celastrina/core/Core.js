@@ -292,11 +292,11 @@ class ResourceAuthorization {
     }
     /**
      * @param {string} resource
-     * @param {object} [options={}}]
+     * @param {object} [options=null]
      * @return {Promise<_CelastrinaToken>}
      * @private
      */
-    async _refresh(resource, options = {}) {
+    async _refresh(resource, options = null) {
         let token = await this._resolve(resource, options);
         if(this._skew !== 0) token.expires.add(this._skew, "seconds");
         this._tokens[resource] = token;
@@ -318,10 +318,11 @@ class ResourceAuthorization {
     /**
      * Returns JUST the token string
      * @param {string} resource
+     * @param {object} [options=null]
      * @return {Promise<string>}
      */
-    async getToken(resource) {
-        /** @type{_CelastrinaToken}*/let token = await this._getToken(resource);
+    async getToken(resource, options = null) {
+        /** @type{_CelastrinaToken}*/let token = await this._getToken(resource, options);
         return token.token;
     }
     /**
@@ -391,10 +392,10 @@ class ManagedIdentityResource extends ResourceAuthorization {
     }
     /**
      * @param {string} resource
-     * @param {(null|undefined|{principalId?:string,timeout?:number})} [options={}]
+     * @param {(null|{principalId?:string,timeout?:number})} [options=null]
      * @return {Promise<_CelastrinaToken>}
      */
-    async _resolve(resource, options = {}) {
+    async _resolve(resource, options = null) {
         try {
             let _params = new URLSearchParams();
             _params.set("api-version", "2019-08-01");
@@ -403,7 +404,7 @@ class ManagedIdentityResource extends ResourceAuthorization {
             if(_strip) resource = resource.replace("/.default", "");
             _params.set("resource", resource);
             let _principal = null;
-            if(typeof options === "object" && options != null) {
+            if(options != null) {
                 if(typeof options.principalId === "string") _principal = options.principalId;
                 if(typeof options.timeout === "number") _config.timeout = options.timeout;
             }
@@ -832,6 +833,7 @@ class AppSettingsPropertyManager extends PropertyManager {
         super();
         this._timeout = getDefaultTimeout(timeout);
         /** @type{boolean}*/this._followVaultReference = followVaultReference;
+        /** @type{Object}*/this._tokenOptions = null;
         if(this._followVaultReference) {
             if(typeof vaultResource !== "string" || vaultResource.trim().length === 0)
                 throw CelastrinaValidationError.newValidationError("Arguemtn 'vaultResource' is required.", "vaultResource");
@@ -868,11 +870,23 @@ class AppSettingsPropertyManager extends PropertyManager {
         this._vaultResource = resource;
     }
     /**
+     * @param {ResourceAuthorization} ra
+     * @param {string} resource
+     * @returns {Promise<*>}
+     */
+    async getResourceTokenWithOptions(ra, resource) {
+        return ra.getToken(resource, this._tokenOptions);
+    }
+    /**
      * @param azcontext
      * @param config
      * @return {Promise<void>}
      */
     async initialize(azcontext, config) {
+        let _identityOverride = process.env[Configuration.PROP_CONFIG_MI_OVERRIDE];
+        if(typeof _identityOverride === "string" && _identityOverride.trim().length > 0) {
+            this._tokenOptions = {principalId: _identityOverride.trim()};
+        }
         if(this._followVaultReference) {
             if(this._vaultResource === ManagedIdentityResource.MANAGED_IDENTITY) {
                 if(typeof process.env["IDENTITY_ENDPOINT"] !== "string")
@@ -885,6 +899,15 @@ class AppSettingsPropertyManager extends PropertyManager {
                 throw CelastrinaError.newError(
                     "Vault resource authorization '" + this._vaultResource + "' not found. AppSettingsPropertyManager initialization failed.");
         }
+    }
+    /**
+     * @param {_AzureFunctionContext} azcontext
+     * @param {Object} config
+     * @returns {Promise<void>}
+     */
+    async ready(azcontext, config) {
+        await super.ready(azcontext, config);
+        this._tokenOptions = null;
     }
     /**
      * @param {{content_type?:string}} object
@@ -903,7 +926,9 @@ class AppSettingsPropertyManager extends PropertyManager {
     async resolveVaultReference(object) {
         try {
             /**@type{{uri?:string}}*/let _vlt = JSON.parse(object.value);
-            return await this._vault.getSecret(await this._authVault.getToken("https://vault.azure.net"), _vlt.uri);
+            return await this._vault.getSecret(
+                await this.getResourceTokenWithOptions(this._authVault,"https://vault.azure.net"),
+                _vlt.uri);
         }
         catch(exception) {
             throw CelastrinaError.wrapError(exception);
@@ -991,7 +1016,6 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      */
     async initialize(azcontext, config) {
         await super.initialize(azcontext, config);
-
         if(typeof this._configStore !== "string" || this._configStore.trim().length === 0)
             throw new CelastrinaValidationError.newValidationError("Property '_configStore' is required.", "_configStore");
         if(typeof this._propResource !== "string" || this._propResource.trim().length === 0)
@@ -1016,18 +1040,10 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
         }
     }
     /**
-     * @param {_AzureFunctionContext} azcontext
-     * @param {Object} config
-     * @return {Promise<void>}
-     */
-    async ready(azcontext, config) {}
-    /**
      * @param {{value?:string}} kvp
      * @return {Promise<string>}
      */
-    async resolveFeatureFlag(kvp) {
-            return kvp.value;
-    }
+    async resolveFeatureFlag(kvp) {return kvp.value;}
     /**
      * @param {{content_type?:string}} kvp
      * @return {boolean}
@@ -1045,7 +1061,7 @@ class AppConfigPropertyManager extends AppSettingsPropertyManager {
      */
     async _getProperty(key) {
         try {
-            let token = await this._authProp.getToken(this._configStore);
+            let token = await this.getResourceTokenWithOptions(this._authProp, this._configStore);
             let _endpoint = this._endpoint.replace("{key}", key);
             let response = await axios.get(_endpoint,
                                            {params: this._params,
@@ -2390,10 +2406,13 @@ class Configuration {
     /**@type{string}*/static CONFIG_PROPERTY = "celastrinajs.core.property.manager";
     /**@type{string}*/static CONFIG_RESOURCE = "celastrinajs.core.resource.manager";
     /**@type{string}*/static CONFIG_PERMISSION = "celastrinajs.core.sentry.permission.manager";
-    /**@type{string}*/static PROP_LOCAL_DEV = "celastringjs.core.property.deployment.local.development";
     /**@type{string}*/static CONFIG_SENTRY = "celastrinajs.core.sentry";
     /**@type{string}*/static CONFIG_ROLE_FACTORY = "celastrinajs.core.sentry.role.factory";
     /**@type{string}*/static CONFIG_AUTHORIATION_OPTIMISTIC = "celastrinajs.core.authorization.optimistic";
+    /**@type{string}*/static PROP_LOCAL_DEV = "celastringjs.core.property.deployment.local.development";
+    /**@type{string}*/static PROP_CONFIG_PROPERTY = "celastringjs.core.config.property";
+    /**@type{string}*/static PROP_CONFIG_MI_OVERRIDE = "celastringjs.core.config.mi.override";
+
     /**
      * @param{string} name
      * @param {(null|string)} [property=null]
@@ -2800,6 +2819,13 @@ class Configuration {
      */
     async afterInitialize(azcontext, pm, rm) {}
     /**
+     * @private
+     */
+    _setProperty() {
+        let _property = process.env[Configuration.PROP_CONFIG_PROPERTY];
+        if(typeof _property === "string" && _property.trim().length > 0) this._property = _property.trim();
+    }
+    /**
      * @param {_AzureFunctionContext} azcontext
      * @return {Promise<void>}
      */
@@ -2813,6 +2839,7 @@ class Configuration {
                 azcontext.log.error("[FATAL][Configuration.load(azcontext)]: Invalid Configuration. Name cannot be undefined, null, or empty.");
                 throw CelastrinaValidationError.newValidationError("Name cannot be undefined, null, or 0 length.", Configuration.CONFIG_NAME);
             }
+            this._setProperty();
             await this.beforeInitialize(azcontext);
             /**@type{PropertyManager}*/let _pm = this._getPropertyManager(azcontext); // Smart-load PropertyManager
             /**@type{PermissionManager}*/let _prm = this._getPermissionManager(azcontext); // Smart-load PermissionManager
@@ -4040,6 +4067,7 @@ module.exports = {
     RoleFactoryParser: RoleFactoryParser,
     PrincipalMappingParser: PrincipalMappingParser,
     CachePropertyParser: CachePropertyParser,
+    AppRegistrationResourceParser: AppRegistrationResourceParser,
     ConfigParser: ConfigParser,
     LifeCycle: LifeCycle,
     AddOnManager: AddOnManager,
