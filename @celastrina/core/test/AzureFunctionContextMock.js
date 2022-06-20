@@ -32,8 +32,6 @@
 
 class MockAzureFunctionContext {
     constructor() {
-        this.doneInvoked = false;
-        this.donecontents = null;
         this.bindings     = {
                              tick: {
                                  schedule: {adjustForDST: true},
@@ -70,8 +68,12 @@ class MockAzureFunctionContext {
                                  cookies: null
                              },
                              mockBindingTwo: {key: "mock_key", value: "mock_value"}};
-        this.bindingData  = {invocationId: "mock_invocation_id"};
-        this.invocationId = this.bindingData.invocationId;
+        this.bindingData  = {};
+        this.executionContext = {
+            invocationId: "mock_invocation_id",
+            functionName: "mock_function",
+            functionDirectory: "/var/sites/wwwroot/"
+        }
         this.traceContext = {traceparent: "mock_trace_id"};
         this.log = {
             message: null,
