@@ -4002,15 +4002,20 @@ class BaseFunction extends CelastrinaFunction {
             }
         }
         catch(error) {
-            _err = this._toCelastrinaError(azcontext, error);
-            if(this._context != null) await this._exception(this._context, _err);
+            try {
+                _err = this._toCelastrinaError(azcontext, error);
+                if(this._context != null) await this._exception(this._context, _err);
+            }
+            catch(ierror) {
+                _err = this._toCelastrinaError(azcontext, ierror);
+            }
         }
         finally {
             try {
                 if(this._context != null) await this._terminate(this._context);
             }
-            catch(error) {
-                _err = this._toCelastrinaError(azcontext, error);
+            catch(ierror) {
+                _err = this._toCelastrinaError(azcontext, ierror);
             }
         }
         if(_err != null) await this._onError(azcontext, this._context, _err);
