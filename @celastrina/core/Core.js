@@ -4013,15 +4013,17 @@ class BaseFunction extends CelastrinaFunction {
                 _err = this._toCelastrinaError(azcontext, error);
             }
         }
-        await this._onError(_err);
+        if(_err != null) await this._onError(azcontext, this._context, _err);
     }
     /**
+     * @param {_AzureFunctionContext} azcontext
+     * @param {Context} context
      * @param {CelastrinaError} error
      * @return {Promise<void>}
      * @private
      */
-    async _onError(error) {
-        if(error != null) throw error;
+    async _onError(azcontext, context, error) {
+        throw error;
     }
     /**
      * @param {_AzureFunctionContext} azcontext
