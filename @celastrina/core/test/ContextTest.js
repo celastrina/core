@@ -90,9 +90,13 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 _context.log("mock_message");
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_invocation_id][" + _context.requestId + "]: mock_message");
+
+                //[mock_function][mock_configuration][mock_invocation_id][ff99105a-f3b5-40a1-b0a5-c4a1b2b00cbd][mock_trace_id]: mock_message
+
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "info");
             });
             it("Logs WARN", async () => {
@@ -100,9 +104,10 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 _context.log("mock_message", LOG_LEVEL.WARN);
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_invocation_id][" + _context.requestId + "]: mock_message");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "warn");
             });
             it("Logs ERROR", async () => {
@@ -110,9 +115,10 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 _context.log("mock_message", LOG_LEVEL.ERROR);
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_invocation_id][" + _context.requestId + "]: mock_message");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "error");
             });
             it("Logs VERBOSE", async () => {
@@ -120,9 +126,10 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 _context.log("mock_message", LOG_LEVEL.VERBOSE);
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_invocation_id][" + _context.requestId + "]: mock_message");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "verbose");
             });
             it("Logs WARN from THREAT with THREAT tagging", async () => {
@@ -130,9 +137,10 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 _context.log("mock_message", LOG_LEVEL.THREAT);
-                assert.strictEqual(_azcontext.log.message, "[THREAT][mock_configuration][mock_invocation_id][" + _context.requestId + "]: mock_message");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id][THREAT]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "warn");
             });
             it("Logs VERBOSE from unknown", async () => {
@@ -140,11 +148,12 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 let __LEVEL = LOG_LEVEL;
                 __LEVEL.UNKNOWN = 99;
                 _context.log("mock_message", __LEVEL.UNKNOWN);
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_invocation_id][" + _context.requestId + "]: mock_message");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "verbose");
             });
             it("Logs INFO with Subject 'mock_subject'", async () => {
@@ -152,9 +161,10 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 _context.log("mock_message", LOG_LEVEL.INFO, "mock_subject");
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_subject][mock_invocation_id][" + _context.requestId + "]: mock_message");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id][mock_subject]: mock_message");
                 assert.strictEqual(_azcontext.log.invoked, "info");
             });
         });
@@ -164,10 +174,11 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context( _config);
+                await _context.initialize();
                 _azcontext.log.reset();
                 let _obj = {mock: "value"};
                 _context.logObjectAsJSON(_obj, LOG_LEVEL.INFO, "mock_subject");
-                assert.strictEqual(_azcontext.log.message, "[mock_configuration][mock_subject][mock_invocation_id][" + _context.requestId + "]: {\"mock\":\"value\"}");
+                assert.strictEqual(_azcontext.log.message, "[mock_function][mock_configuration][mock_invocation_id][" + _context.requestId + "][mock_trace_id][mock_subject]: {\"mock\":\"value\"}");
                 assert.strictEqual(_azcontext.log.invoked, "info");
             });
         });
@@ -178,6 +189,7 @@ describe("BaseContext", () => {
             let _azcontext = new MockAzureFunctionContext();
             await _config.initialize(_azcontext);
             let _context = new Context(_config);
+            await _context.initialize();
             let _subject = new Subject("mock_subject");
             _context.subject = _subject;
             assert.strictEqual(_context.subject, _subject);
@@ -216,6 +228,7 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context(_config);
+                await _context.initialize();
                 await _context.setBinding("mock_bindning-one");
                 assert.strictEqual(_azcontext.bindings["mock_bindning-one"], null);
             });
@@ -224,6 +237,7 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context(_config);
+                await _context.initialize();
                 await _context.setBinding("mock_bindning-one", 42);
                 assert.strictEqual(_azcontext.bindings["mock_bindning-one"], 42);
             });
@@ -234,6 +248,7 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context(_config);
+                await _context.initialize();
                 assert.deepStrictEqual(await _context.getBinding("mockBindingTwo"), {key: "mock_key", value: "mock_value"});
             });
             it("Gets binding set by setter", async () => {
@@ -249,33 +264,8 @@ describe("BaseContext", () => {
                 let _azcontext = new MockAzureFunctionContext();
                 await _config.initialize(_azcontext);
                 let _context = new Context(_config);
+                await _context.initialize();
                 assert.deepStrictEqual(await _context.getBinding("mock_bindning-two", 42), 42);
-            });
-        });
-        describe("#done(value = null)", () => {
-            it("Defaults done to null", async () => {
-                let _config = new Configuration("mock_configuration");
-                let _azcontext = new MockAzureFunctionContext();
-                await _config.initialize(_azcontext);
-                let _context = new Context(_config);
-                _context.done();
-                assert.strictEqual(_context._result, null);
-            });
-            it("Sets results to done", async () => {
-                let _config = new Configuration("mock_configuration");
-                let _azcontext = new MockAzureFunctionContext();
-                await _config.initialize(_azcontext);
-                let _context = new Context(_config);
-                _context.done({test: "value"});
-                assert.deepStrictEqual(_context._result, {test: "value"});
-            });
-            it("Results returns value from done", async () => {
-                let _config = new Configuration("mock_configuration");
-                let _azcontext = new MockAzureFunctionContext();
-                await _config.initialize(_azcontext);
-                let _context = new Context(_config);
-                _context.done({test: "value"});
-                assert.deepStrictEqual(_context.result, {test: "value"});
             });
         });
         describe("#initialize()", () => {

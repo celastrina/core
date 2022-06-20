@@ -48,7 +48,28 @@ const {AccessToken} = require("@azure/identity");
  * @property {moment.Moment} expires
  */
 /**
+ * @typedef _AZLogger
+ * @function error
+ * @function warn
+ * @function info
+ * @function verbose
+ */
+/**
+ * @typedef _TraceContext
+ * @property {string} traceparent
+ */
+/**
+ * @typedef _ExecutionContext
+ * @property {string} invocationId
+ * @property {string} functionName
+ * @property {string} functionDirectory
+ */
+/**
  * @typedef _AzureFunctionContext
+ * @property {_ExecutionContext} executionContext
+ * @property {_TraceContext} traceContext
+ * @property {_AZLogger} log
+ * @property {Object} bindings
  */
 /**
  * @typedef _Credential
@@ -1209,7 +1230,7 @@ class CachedPropertyManager extends PropertyManager {
         await Promise.all(promises);
     }
     /**
-     * @param azcontext
+     * @param {_AzureFunctionContext} azcontext
      * @param config
      * @return {Promise<void>}
      */
@@ -1587,7 +1608,7 @@ class ParserChain {
         /**@type{string}*/this._version = version;
         /**@type{ParserChain}*/this._link = link;
         /**@type{PropertyManager}*/this._pm = null;
-        /**@type{_AzureFunctionContext}*/this._azcontext = null;
+        /**@type{(null|_AzureFunctionContext)}*/this._azcontext = null;
         /**@type{Object}*/this._config = null;
         /**@type{AddOnManager}*/this._addons = null;
     }
@@ -1617,7 +1638,7 @@ class ParserChain {
     /**@return{string}*/get type() {return this._type;}
     /**@return{string}*/get version() {return this._version;}
     /**@return{PropertyManager}*/get propertyManager() {return this._pm;}
-    /**@return{_AzureFunctionContext}*/get azureFunctionContext() {return this._azcontext;}
+    /**@return{_AzureFunctionContext}*/get azureFunctionContext() {return /**@type{_AzureFunctionContext}*/this._azcontext;}
     /**@return{Object}*/get config() {return this._config;}
     /**@return{AddOnManager}*/get addOns() {return this._addons;}
     /**
@@ -2734,7 +2755,7 @@ class Configuration {
         else if(this._appConfigOverridePropertyManager()) {
             azcontext.log.info("[Configuration._getPropertyManager(azcontext)]: AppConfigPropertyManager override, using AppConfigPropertyManager.");
             let _factory = new AppConfigPropertyManagerFactory();
-            let _manager = _factory.createPropertyManager();
+            let _manager = _factory.createPropertyManager(azcontext);
             this._config[Configuration.CONFIG_PROPERTY] = _manager;
             return _manager;
         }
@@ -2748,11 +2769,11 @@ class Configuration {
             else {
                 if(instanceOfCelastrinaType(PropertyManagerFactory, _manager)) {
                     /**@type{PropertyManagerFactory}*/let _factory = /**@type{PropertyManagerFactory}*/_manager;
-                    _manager = _factory.createPropertyManager();
+                    _manager = _factory.createPropertyManager(azcontext);
                     this._config[Configuration.CONFIG_PROPERTY] = _manager;
                 }
                 else if(!instanceOfCelastrinaType(PropertyManager, _manager)) {
-                    azcontext.log.error("[Configuration._getPropertyManager(azcontext)]: Invalid property manager. Must be of type '" + PropertyManager.celastrinaType + "'");
+                    azcontext.log.error("[Configuration._getPropertyManager(azcontext)]: Invalid property manager. Must be of type '" + PropertyManager.$object.type + "'");
                     throw CelastrinaError.newError("Invalid property manager.");
                 }
             }
@@ -2832,7 +2853,7 @@ class Configuration {
     async initialize(azcontext) {
         this._config[Configuration.CONFIG_CONTEXT] = azcontext;
         if(!this._loaded) {
-            azcontext.log.info("[STARTING][Configuration.initialize(azcontext)]: Initializing Celastrina by request " + azcontext.bindingData.invocationId + ".");
+            azcontext.log.info("[STARTING][Configuration.initialize(azcontext)]: Initializing Celastrina by request " + azcontext.executionContext.invocationId + ".");
             azcontext.log.info("[Configuration.initialize(azcontext)]: Default global service timeout set to " + getDefaultTimeout() + ".");
             let _name = this._config[Configuration.CONFIG_NAME];
             if(typeof _name !== "string" || _name.trim().length === 0 || _name.indexOf(" ") >= 0) {
@@ -3638,14 +3659,14 @@ class Context {
      * @param {Configuration} config
      */
     constructor(config) {
-        /**@type{string}*/this._requestId = uuidv4();
         /**@type{Configuration}*/this._config = config;
+        /**@type{string}*/this._requestId = uuidv4();
         /**@type{(null|string)}*/this._traceId = null;
         /**@type{boolean}*/this._monitor = false;
         /**@type{MonitorResponse}*/this._monitorResponse = null;
         /**@type{Subject}*/this._subject = null;
         /**@type{string}*/this._action = "process";
-        /**@type{*}*/this._result = null;
+        /**@type{string}*/this._logPreamble = "";
     }
     /**
      * @return {Promise<void>}
@@ -3653,17 +3674,21 @@ class Context {
     async initialize() {
         if(this._monitor)
             this._monitorResponse = new MonitorResponse();
-        /** @type {{traceparent: string}} */
         let _traceContext = this._config.context.traceContext;
         if(typeof _traceContext !== "undefined")
             this._traceId = _traceContext.traceparent;
+        this._logPreamble = "[" + this._config.context.executionContext.functionName + "][" + this._config.name + "][" +
+                             this._config.context.executionContext.invocationId + "][" + this._requestId + "]";
+        if(this._traceId != null) this._logPreamble += "[" + this._traceId + "]";
+
     }
     /**@return{string}*/get name() {return this._config.name;}
     /**@return{Configuration}*/get config(){return this._config;}
-    /**@return{*}*/get result() {return this._result;}
     /**@return{boolean}*/get isMonitorInvocation(){return this._monitor;}
     /**@return{(null|MonitorResponse)}*/get monitorResponse(){return this._monitorResponse;}
-    /**@return{string}*/get invocationId(){return this._config.context.bindingData.invocationId;}
+    /**@return{string}*/get invocationId(){return this._config.context.executionContext.invocationId;}
+    /**@return{string}*/get functionName(){return this._config.context.executionContext.functionName;}
+    /**@return{string}*/get functionDirectory(){return this._config.context.executionContext.functionDirectory;}
     /**@return{string}*/get requestId(){return this._requestId;}
     /**@return{string}*/get traceId(){return this._traceId;}
     /**@param{Sentry} sentry*/set sentry(sentry){this._sentry = sentry;}
@@ -3723,17 +3748,17 @@ class Context {
      * @param {(null|string)} [subject=null]
      */
     log(message, level = LOG_LEVEL.INFO, subject = null) {
-        let out = "[" + this._config.name + "]";
-        if(typeof subject === "string") out += "[" + subject + "]";
-        out += "[" + this._config.context.bindingData.invocationId + "]" + "[" + this._requestId + "]: " + message.toString();
-        if(level === LOG_LEVEL.THREAT) out = "[THREAT]" + out;
+        let out = this._logPreamble;
+        if(subject != null) out += "[" + subject + "]";
+        if(level === LOG_LEVEL.THREAT) out += "[THREAT]";
+        out += ": " + message;
         switch(level) {
-            case LOG_LEVEL.ERROR:this._config.context.log.error(out); break;
-            case LOG_LEVEL.INFO:this._config.context.log.info(out); break;
-            case LOG_LEVEL.WARN:this._config.context.log.warn(out); break;
-            case LOG_LEVEL.VERBOSE:this._config.context.log.verbose(out); break;
+            case LOG_LEVEL.ERROR: this._config.context.log.error(out); break;
+            case LOG_LEVEL.INFO: this._config.context.log.info(out); break;
+            case LOG_LEVEL.WARN: this._config.context.log.warn(out); break;
+            case LOG_LEVEL.VERBOSE: this._config.context.log.verbose(out); break;
             case LOG_LEVEL.THREAT: this._config.context.log.warn(out); break;
-            default:this._config.context.log.verbose(out);
+            default: this._config.context.log.verbose(out);
         }
     }
     /**
@@ -3744,8 +3769,6 @@ class Context {
     logObjectAsJSON(object, level = LOG_LEVEL.INFO, subject = null) {
         this.log(JSON.stringify(object), level, subject);
     }
-    /**@param{*}[value=null]*/
-    done(value = null) {this._result = value;}
 }
 /**
  * CelastrinaFunction
@@ -3847,8 +3870,10 @@ class BaseFunction extends CelastrinaFunction {
     async bootstrap(azcontext) {
         await this._configuration.initialize(azcontext);
         /**@type{Context}*/let _context = await this.createContext(this._configuration);
-        if(typeof _context === "undefined" || _context == null) {
-            azcontext.log.error("[" + azcontext.bindingData.invocationId + "][FATAL][BaseFunction.bootstrap(azcontext)]: Catostrophic Error! Context is null or undefined.");
+        if(!instanceOfCelastrinaType(Context, _context)) {
+            azcontext.log.error("[" + azcontext.executionContext.invocationId +
+                                "][FATAL][BaseFunction.bootstrap(azcontext)]: Catostrophic Error! Context is not an " +
+                                "instance of Context.");
             throw CelastrinaError.newError("Catostrophic Error! Context invalid.");
         }
         await _context.initialize();
@@ -3961,84 +3986,53 @@ class BaseFunction extends CelastrinaFunction {
       * @param {_AzureFunctionContext} azcontext The azcontext of the function.
       */
     async execute(azcontext) {
+        /**@type{CelastrinaError}*/let _err = null;
         try {
             await this.bootstrap(azcontext);
-            if((typeof this._context !== "undefined") && this._context != null) {
-                await this._initialize(this._context);
-                await this._authenticate(this._context);
-                await this._authorize(this._context);
+            await this._initialize(this._context);
+            await this._authenticate(this._context);
+            await this._authorize(this._context);
+            if (this._context.isMonitorInvocation)
+                await this._monitor(this._context);
+            else {
                 await this._validate(this._context);
                 await this._load(this._context);
-                if (this._context.isMonitorInvocation)
-                    await this._monitor(this._context);
-                else
-                    await this._process(this._context);
+                await this._process(this._context);
                 await this._save(this._context);
             }
-            else {
-                azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                    "][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null after bootstrap, skipping all other life-cycles.");
-                throw CelastrinaError.newError("Catostrophic Error! Context null.");
-            }
         }
-        catch(exception) {
-            try {
-                if((typeof this._context !== "undefined") && this._context != null)
-                    await this._exception(this._context, exception);
-                else {
-                    let _ex = this._unhandled(azcontext, exception);
-                    azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                        "][FATAL][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null, skipping exception life-cycle: " +
-                        _ex);
-                }
-            }
-            catch(_exception) {
-                let _ex = this._unhandled(azcontext, _exception);
-                azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                    "][FATAL][BaseFunction.execute(azcontext)]: Exception thrown from Exception life-cycle: " +
-                                  _ex  + ", caused by " + exception + ". ");
-            }
+        catch(error) {
+            _err = this._toCelastrinaError(azcontext, error);
+            if(this._context != null) await this._exception(this._context, _err);
         }
         finally {
             try {
-                if((typeof this._context !== "undefined") && this._context != null) {
-                    await this._terminate(this._context);
-                    if (this._context.result == null)
-                        azcontext.done();
-                    else
-                        azcontext.done(this._context.result);
-                }
-                else {
-                    azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                        "][FATAL][BaseFunction.execute(azcontext)]: Catostrophic Error! Context was null, skipping terminate life-cycle.");
-                    throw CelastrinaError.newError("Catostrophic Error! Context null.");
-                }
+                if(this._context != null) await this._terminate(this._context);
             }
-            catch(exception) {
-                let _ex = this._unhandled(azcontext, exception);
-                azcontext.log.error("[" + azcontext.bindingData.invocationId +
-                                    "][UNHANDLED][BaseFunction.execute(azcontext)]: Exception thrown from Terminate life-cycle: " +
-                                    _ex);
-                azcontext.res.status = _ex.code;
-                azcontext.done(_ex);
+            catch(error) {
+                _err = this._toCelastrinaError(azcontext, error);
             }
         }
+        await this._onError(_err);
     }
     /**
-     * @param {_AzureFunctionContext} context
-     * @param {(exception|Error|CelastrinaError|*)} exception
+     * @param {CelastrinaError} error
+     * @return {Promise<void>}
      * @private
      */
-    _unhandled(context, exception) {
-        /**@type{(exception|Error|CelastrinaError|*)}*/let ex = exception;
-        if(typeof ex === "undefined" || ex == null) ex = CelastrinaError.newError("Unhandled server error.");
-        else if(!instanceOfCelastrinaType(CelastrinaError, ex)) {
-            if(ex instanceof Error) ex = CelastrinaError.wrapError(ex);
-            else ex = CelastrinaError.newError(ex);
-        }
-        context.log.error("[BaseFunction._unhandled(context, exception)][exception]: \r\n (MESSAGE:" + ex.message +
-                          ") \r\n (STACK:" + ex.stack + ") \r\n (CAUSE:" + ex.cause + ")");
-        return ex;
+    async _onError(error) {
+        if(error != null) throw error;
+    }
+    /**
+     * @param {_AzureFunctionContext} azcontext
+     * @param {*} error
+     * @private
+     */
+    _toCelastrinaError(azcontext, error) {
+        /**@type{CelastrinaError}*/let _err = CelastrinaError.wrapError(error);
+        azcontext.log.error("[BaseFunction._toCelastrinaError(context, exception)][error]:\r\n(MESSAGE: " + _err.message +
+                            ")\r\n(STACK: " + _err.stack + ")\r\n(CAUSE: " + _err.cause + ")");
+        return _err;
     }
 }
 module.exports = {
