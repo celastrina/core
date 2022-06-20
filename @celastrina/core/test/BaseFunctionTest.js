@@ -69,14 +69,13 @@ class MockFunction extends BaseFunction {
     }
     async createContext(config) {
         this.createContextInvoked = true;
-        let _context = await super.createContext(config);
-        if(this.fakeInvalidContext) return null;
-        else return _context;
+        if(this.fakeInvalidContext) return {};
+        else if(this.fakeNullContext) return null;
+        else return await super.createContext(config);
     }
     async bootstrap(azcontext) {
         this.bootStrapInvoked = true;
-        await super.bootstrap(azcontext);
-        if(this.fakeNullContext) this._context = null;
+        return super.bootstrap(azcontext);
     }
     async initialize(context) {
         this.initializInvoked = true;
@@ -151,8 +150,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, true, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
         it("Should execute successfully mutliple times in a row", async () => {
             await assert.doesNotReject(_func.execute(_azcontext));
@@ -168,8 +165,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, true, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
             _func.reset();
             await assert.doesNotReject(_func.execute(_azcontext));
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
@@ -184,8 +179,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, true, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
             _func.reset();
             await assert.doesNotReject(_func.execute(_azcontext));
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
@@ -200,8 +193,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, true, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
     describe("#execute(azcontext), with celastrina error in process.", () => {
@@ -211,7 +202,7 @@ describe("BaseFunction", () => {
         _func.causeErrorInProcess = true;
         let _azcontext = new MockAzureFunctionContext();
         it("Should execute with exception.", async () => {
-            await assert.doesNotReject(_func.execute(_azcontext));
+            await assert.rejects(_func.execute(_azcontext));
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
             assert.strictEqual(_func.bootStrapInvoked, true, "Invoke Bootstrap.");
             assert.strictEqual(_func.initializInvoked, true, "Invoke Initialize.");
@@ -224,8 +215,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, false, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, true, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
     describe("#execute(azcontext), with celastrina error in exception.", () => {
@@ -236,7 +225,7 @@ describe("BaseFunction", () => {
         _func.causeErrorInException = true;
         let _azcontext = new MockAzureFunctionContext();
         it("Should execute with exception.", async () => {
-            await assert.doesNotReject(_func.execute(_azcontext));
+            await assert.rejects(_func.execute(_azcontext));
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
             assert.strictEqual(_func.bootStrapInvoked, true, "Invoke Bootstrap.");
             assert.strictEqual(_func.initializInvoked, true, "Invoke Initialize.");
@@ -249,8 +238,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, false, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, true, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
     describe("#execute(azcontext), with celastrina error in terminate.", () => {
@@ -260,7 +247,7 @@ describe("BaseFunction", () => {
         _func.causeErrorInTerminate = true;
         let _azcontext = new MockAzureFunctionContext();
         it("Should execute with exception.", async () => {
-            await assert.doesNotReject(_func.execute(_azcontext));
+            await assert.rejects(_func.execute(_azcontext));
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
             assert.strictEqual(_func.bootStrapInvoked, true, "Invoke Bootstrap.");
             assert.strictEqual(_func.initializInvoked, true, "Invoke Initialize.");
@@ -273,8 +260,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, true, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
     describe("#execute(azcontext), with celastrina error in initialize.", () => {
@@ -284,7 +269,7 @@ describe("BaseFunction", () => {
         _func.causeErrorInInitialize = true;
         let _azcontext = new MockAzureFunctionContext();
         it("Should execute with exception.", async () => {
-            await assert.doesNotReject(_func.execute(_azcontext));
+            await assert.rejects(_func.execute(_azcontext));
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
             assert.strictEqual(_func.bootStrapInvoked, true, "Invoke Bootstrap.");
             assert.strictEqual(_func.initializInvoked, true, "Invoke Initialize.");
@@ -297,18 +282,16 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, false, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, true, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, true, "Invoke Exception.");
-            assert.strictEqual(_func.context.result, null, "Context result null.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
-    describe("#execute(azcontext), with null context after bootstrap.", () => {
+    describe("#execute(azcontext), with null context.", () => {
         let _config = new Configuration("mock_configuration");
         _config.setAuthorizationOptimistic(true);
         let _func = new MockFunction(_config);
         _func.fakeNullContext = true;
         let _azcontext = new MockAzureFunctionContext();
         it("Should execute with exception.", async () => {
-            await assert.doesNotReject(_func.execute(_azcontext));
+            await assert.rejects(_func.execute(_azcontext));
             assert.strictEqual(_azcontext.res.status, 500, "Expected 500.");
             assert.strictEqual(_func.context, null, "Context result null.");
             assert.strictEqual(_config.loaded, true, "Configuration Loaded.");
@@ -323,19 +306,17 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, false, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, false, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
-    describe("#execute(azcontext), with null context after create.", () => {
+    describe("#execute(azcontext), with invalid context.", () => {
         let _config = new Configuration("mock_configuration");
         _config.setAuthorizationOptimistic(true);
         let _func = new MockFunction(_config);
         _func.fakeInvalidContext = true;
         let _azcontext = new MockAzureFunctionContext();
         it("Should execute with exception.", async () => {
-            await assert.doesNotReject(_func.execute(_azcontext));
+            await assert.rejects(_func.execute(_azcontext));
             assert.strictEqual(_azcontext.res.status, 500, "Expected 500.");
-            assert.strictEqual(_func.context, null, "Context result null.");
             assert.strictEqual(_func.bootStrapInvoked, true, "Invoke Bootstrap.");
             assert.strictEqual(_func.initializInvoked, false, "Invoke Initialize.");
             assert.strictEqual(_func.authenticateInvoked, false, "Invoke Authenticate.");
@@ -347,7 +328,6 @@ describe("BaseFunction", () => {
             assert.strictEqual(_func.saveInvoked, false, "Invoke Save.");
             assert.strictEqual(_func.terminateInvoked, false, "Invoke Terminate.");
             assert.strictEqual(_func.exceptionInvoked, false, "Invoke Exception.");
-            assert.strictEqual(_azcontext.doneInvoked, true, "Azure Context Done.");
         });
     });
 });
