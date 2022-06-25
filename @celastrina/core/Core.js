@@ -105,9 +105,9 @@ function _getType(_target, isInstance = true) {
         return null;
 }
 /**
- * @brief Used to type-safe-check across node packages.
- * @description Uses static get attribute <code>static get celastrinaType</code> method to get the type string. Use this
- *              instead of instanceof for Celastrina types as this is a package-safe jecks for versions 4.x and up.
+ * @brief Used to type-safe-check Celastrina Objects across node packages.
+ * @description Uses static get attribute <code>static get $object</code> method to get the type string. Use this
+ *              instead of instanceof for Celastrina types as this is a package-safe check for versions 4.x and up.
  * @param {(Error|Class)} _class The celastrinajs typestring.
  * @param {Object} _object The object instance you would like to check.
  * @return {boolean} True, if the target types is equalt to source type, false otherwise.
@@ -279,6 +279,77 @@ class CelastrinaEvent {
         this._rejected = true;
         this._cause = cause;
     }
+}
+/**
+ * CelastrinaFunction
+ * @author Robert R Murrell
+ * @abstract
+ */
+class CelastrinaFunction {
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CelastrinaFunction#",
+        type: "celastrinajs.core.CelastrinaFunction"}};
+    constructor(configuration) {}
+    /**
+     * @param {Configuration} config
+     * @return {Promise<Context>}
+     */
+    async createContext(config) {return new Context(config);}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async initialize(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<Subject>}
+     */
+    async authenticate(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async authorize(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async validate(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async monitor(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async load(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async process(context) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async save(context) {}
+    /**
+     * @param {Context} context
+     * @param {*} exception
+     * @return {Promise<void>}
+     */
+    async exception(context, exception) {}
+    /**
+     * @param {Context} context
+     * @return {Promise<void>}
+     */
+    async terminate(context) {}
+    /**
+     * @brief Method called by the Azure Function to execute the lifecycle.
+     * @param {_AzureFunctionContext} azcontext The azcontext of the function.
+     */
+    async execute(azcontext) {}
 }
 /**
  * ResourceAuthorization
@@ -2177,9 +2248,106 @@ class CoreConfigParser extends ConfigParser {
     }
 }
 /**
+ * AddOnEvent
+ * @author Robert R Murrell
+ */
+class AddOnEvent extends CelastrinaEvent {
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AddOnEvent#",
+                                                      type: "celastrinajs.core.AddOnEvent"}};
+    static TYPE = {INITIALIZE: "onInitialize", AUTHENTICATE: "onAuthenticate", AUTHORIZE: "onAuthorize",
+                    BEFORE_VALIDATE: "onBeforeValidate", AFTER_VALIDATE: "onAfterValidate",
+                    BEFORE_LOAD: "onBeforeLoad", AFTER_LOAD: "onAfterLoad", BEFORE_MONITOR: "onBeforeMonitor",
+                    AFTER_MONITOR: "onAfterMonitor", BEFORE_PROCESS: "onBeforeProcess", AFTER_PROCESS: "onAfterProcess",
+                    BEFORE_SAVE: "onBeforeSave", AFTER_SAVE: "onAfterSave", BEFORE_EXCEPTION: "onBeforeException",
+                    AFTER_EXCEPTION: "onAfterException", BEFORE_TERMINATE: "onBeforeTerminate",
+                    AFTER_TERMINATE: "onAfterTerminate"};
+    /**
+     * @param {string} type
+     * @param {Context} context
+     * @param {*} [source=null]
+     * @param {*} [data=null]
+     * @param {moment.Moment} [time=moment()]
+     * @param {boolean} [rejected=false]
+     * @param {*} [cause=null]
+     */
+    constructor(type, context, source = null, data = null, time = moment(), rejected = false,
+                cause = null) {
+        super(context, source, data, time, rejected, cause);
+        this._type = type;
+        /**@type{Array<string>}*/this._addOnsRejected = [];
+    }
+    /**@returns{string}*/get type() {return this._type;}
+    /**
+     * @param {AddOn} addon
+     */
+    addRejectedByAddOn(addon) {
+        this._addOnsRejected.push(addon.constructor.$object.addOn);
+    }
+    /**
+     * @param {(string|Class<AddOn>)} addon
+     * @return {Promise<boolean>}
+     */
+    async isRejectedByAddOn(addon) {
+        return this._addOnsRejected.includes(((typeof addon === "string") ? addon : addon.$object.addOn));
+    }
+}
+/**
+ * AddOnEventHandler
+ * @author Robert R Murrell
+ */
+class AddOnEventHandler {
+    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AddOnEventHandler#",
+                                                      type: "celastrinajs.core.AddOnEventHandler"}};
+    constructor() {
+        /**@type{Map<string, Array<{handler:function(AddOnEvent, AddOn, *), addOn:AddOn, data?:*}>>}*/this._listeners = new Map();
+    }
+    /**
+     * @brief Pass in an async function handler with the following signature: function(AddOnEvent, ?*)
+     * @param {string} type The type of event to listen for.
+     * @param {AddOn} addon The type of event to listen for.
+     * @param {function(AddOnEvent, AddOn, *)} handler The handler invoked when the event occurs, must be async.
+     * @param {*} data Optional data to passed to the handler when the event occurs.
+     * @return {Promise<void>}
+     */
+    async addEventListener(type, addon, handler, data = null) {
+        if(typeof type !== "string" || type.trim().length === 0)
+            throw CelastrinaValidationError.newValidationError(
+                "[AddOnEventHandler.addEventListener]: Arguemnt 'type' is required.", "type");
+        if(typeof handler !== "function")
+            throw CelastrinaValidationError.newValidationError(
+                "[AddOnEventHandler.addEventListener]: Arguemnt 'handler' is required and must be a " +
+                        "function with signature function(AddOnEvent, ?*) .",
+                    "handler");
+        let listeners = this._listeners.get(type);
+        if(typeof listeners === "undefined") {
+            listeners = [];
+            this._listeners.set(type, listeners);
+        }
+        listeners.push({handler: handler, addOn: addon, data: data});
+    }
+    /**
+     * @param {string} type
+     * @param {BaseFunction} source
+     * @param {Context} context
+     * @param {*} [data=null]
+     * @return {Promise<void>}
+     */
+    async fireAddOnEvent(type, source, context, data = null) {
+        /**@type{Array<{handler:function(AddOnEvent, AddOn, *), addOn:AddOn, data?:*}>}*/let listeners = this._listeners.get(type);
+        if(typeof listeners !== "undefined") {
+            let event = new AddOnEvent(type, context, source, data);
+            for(let listener of listeners) {
+                await listener.handler(event, listener.addOn, listener.data);
+                if(event.isRejected) event.addRejectedByAddOn(listener.addOn);
+            }
+        }
+    }
+}
+/**
  * Configuration
  * @author Robert R Murrell
  * @abstract
+ * @function doLifeCycle(lifecycle:LifeCycle)
  */
 class AddOn {
     /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AddOn#",
@@ -2187,89 +2355,61 @@ class AddOn {
                                                       addOn: "celastrinajs.core.AddOn"}};
     /**
      * @param {Array<string>} [dependencies=[]]
-     * @param {Array<number>} [lifecycles=[]]
      */
-    constructor(dependencies = [], lifecycles = []) {
+    constructor(dependencies = []) {
         /**@type{Set<string>}*/this._dependencies = new Set(dependencies);
-        /**@type{Set<number>}*/this._lifecycles = new Set(lifecycles);
     }
     /**@return{Set<string>}*/get dependancies() {return this._dependencies;}
-    /**@return{Set<number>}*/get lifecycles() {return this._lifecycles;}
     /**@return {ConfigParser}*/getConfigParser() {return null;}
     /**@return {AttributeParser}*/getAttributeParser() {return null;}
     /**
      * @param {_AzureFunctionContext} azcontext
      * @param {Object} config
+     * @param {AddOnEventHandler} handler
      * @return {Promise<void>}
      */
-    async initialize(azcontext, config) {};
-}
-/**
- * LifeCycle
- * @author Robert R Murrell
- */
-class LifeCycle {
-    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/LifeCycle#",
-                                                      type: "celastrinajs.core.LifeCycle"}};
-    /**@return{string}*/static get version() {return "1.0.0";}
-    /**
-     * @type {{AUTHENTICATE: number, TERMINATE: number, INITIALIZE: number, AUTHORIZE: number, LOAD: number,
-     *         MONITOR: number, PROCESS: number, EXCEPTION: number, VALIDATE: number, SAVE: number}}
-     */
-    static STATE = {
-        INITIALIZE: 0, AUTHENTICATE: 1, AUTHORIZE: 2, VALIDATE: 3, LOAD: 4, MONITOR: 5, PROCESS: 6,
-        SAVE: 7, TERMINATE: 8, EXCEPTION: 9};
-    /**
-     * @param {Context} context
-     * @param {BaseFunction} source
-     * @param {number} [lifecycle=LifeCycle.STATE.EXCEPTION]
-     * @param {*} [exception=null]
-     */
-    constructor(context, source, lifecycle = LifeCycle.STATE.EXCEPTION, exception = null) {
-        /**@type{BaseFunction}*/this._source = source;
-        /**@type{Context}*/this._context = context;
-        /**@type{number}*/this._lifecycle = lifecycle;
-        /**@type{*}*/this._exception = exception;
-    }
-    /**@return{BaseFunction}*/get source() {return this._source;}
-    /**@return{Context}*/get context() {return this._context;}
-    /**@return{number}*/get lifecycle() {return this._lifecycle;}
-    /**@return{*}*/get exception() {return this._exception;}
-}
-function _getAddOn(addOn) {
-    let _schema = _getSchema(addOn, true);
-    if(_schema == null) throw CelastrinaError.newError("Object '" + addOn.constructor.name + "' is not an AddOn.");
-    else if(_schema.hasOwnProperty("addOn") && typeof _schema.addOn === "string" && _schema.addOn.trim().length > 0)
-        return _schema.addOn;
-    else
-        throw CelastrinaError.newError("Object '" + addOn.constructor.name + "' is not an AddOn.");
+    async install(azcontext, config, handler) {};
 }
 /**
  * AddOnManager
  * @author Robert R Murrell
  * @private
  */
-class AddOnManager {
+class AddOnManager extends AddOnEventHandler {
     /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/AddOnManager#",
                                                       type: "celastrinajs.core.AddOnManager"}};
     static NOT_FOUND = -1;
     constructor() {
-        /**@type{Object}*/this._addons = {};
+        super();
         /**@type{Map<string, AddOn>}*/this._unresolved = new Map();
         /**@type{Array<AddOn>}*/this._target = [];
-        /**@type{Map<number, Set<AddOn>>}*/this._listeners = new Map();
         /**@type{number}*/this._depth = 0;
         this._ready = false;
     }
-    get target() {return this._target;}
-    _indexOf(name, start = 0) {
+    /**@type{Array<AddOn>}*/get addOns() {return this._target;}
+    /**
+     * @param {(string|Class<AddOn>)} addon
+     * @return {Promise<AddOn>}
+     */
+    async get(addon) {
+        let _name = (typeof addon === "string")? addon : addon.$object.addOn;
+        /**@type{AddOn}*/let _addon = null;
+        for(let _target of this._target) {
+            if(_target.constructor.$object.addOn === _name) {
+                _addon = _target;
+                break;
+            }
+        }
+        return _addon;
+    }
+    /**@private*/_indexOf(name, start = 0) {
         for(let i = start; i < this._target.length; ++i) {
             let _addon = this._target[i];
-            if(name === _getAddOn(_addon)) return i;
+            if(name === _addon.constructor.$object.addOn) return i;
         }
         return AddOnManager.NOT_FOUND;
     }
-    _allResolved(addon) {
+    /**@private*/_allResolved(addon) {
         let _remaining = new Set();
         for(let _dep of addon.dependancies) {
             if(this._indexOf(_dep) === AddOnManager.NOT_FOUND) _remaining.add(_dep);
@@ -2283,7 +2423,6 @@ class AddOnManager {
     add(addon) {
         if(this._ready) throw CelastrinaError.newError("Invalid state, AddOnManager alread installed.");
         if(!instanceOfCelastrinaType(AddOn, addon)) throw CelastrinaError.newError("Object '" + addon.constructor.name + "' is not an AddOn.");
-        this._addons[_getAddOn(addon)] = addon;
         if(addon.dependancies.size === 0) this._target.unshift(addon);
         else if(this._target.length > 0 && this._allResolved(addon)) {
             this._target.push(addon);
@@ -2295,42 +2434,6 @@ class AddOnManager {
         }
     }
     /**
-     * @brief Gets an addOn by its class name, or its class type.
-     * @param {(string|Class<AddOn>)} addon
-     */
-    get(addon) {
-        /**@type{string}*/let _name;
-        (typeof addon === "string") ? _name = addon : _name = addon.$object.addOn;
-        let _addon = this._addons[_name];
-        if(typeof _addon === "undefined") return null;
-        else return _addon;
-    }
-    /**
-     * @param {(string|Class<AddOn>)} addon
-     */
-    has(addon) {
-        /**@type{string}*/let _name = ((typeof addon === "string") ? addon : addon.$object.addOn);
-        return (this._addons.hasOwnProperty(_name));
-    }
-    /**
-     * @param {number} lifecycle
-     * @param {BaseFunction} source
-     * @param {Context} context
-     * @param {*} [exception=null]
-     * @return {Promise<void>}
-     */
-    async doLifeCycle(lifecycle, source, context, exception = null) {
-        /**@type{Set<(AddOn|{doLifeCycle?:function(Object)})>}*/let _addons = this._listeners.get(lifecycle);
-        if(typeof _addons !== "undefined") {
-            if(_addons.size > 0) {
-                let _lifecycle = new LifeCycle(context, source, lifecycle, exception);
-                for(let _addon of _addons) {
-                    await _addon.doLifeCycle(_lifecycle);
-                }
-            }
-        }
-    }
-    /**
      * @param {Object} azcontext
      * @param {boolean} [parse=false]
      * @param {ConfigParser} [cfp=null]
@@ -2339,9 +2442,9 @@ class AddOnManager {
     async install(azcontext, parse = false, cfp = null, atp = null) {
         if(this._target.length > 0 || this._unresolved.size > 0) {
             azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On's, JSON configuration mode " +
-                               parse + ".");
+                parse + ".");
             let _pass = 0;
-            while(_pass < this._depth) {
+            while(_pass < this._depth) { // Resove dependencies, ordering target based on dependencies.
                 for(let _addon of this._unresolved.values()) {
                     this.add(_addon);
                 }
@@ -2360,6 +2463,7 @@ class AddOnManager {
                 throw CelastrinaError.newError(_sunrslvd);
             }
             else {
+                // All dependencies resolved, get the parsers.
                 for(/**@type{(AddOn|{constructor})}*/let _addon of this._target) {
                     azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Installing Add-On " +
                         _addon.constructor.name + ":" + _addon.constructor.$object.addOn + ".");
@@ -2368,17 +2472,6 @@ class AddOnManager {
                         if(_acfp != null) cfp.addLink(_acfp);
                         let _aatp = _addon.getAttributeParser();
                         if(_aatp != null) atp.addLink(_aatp);
-                    }
-                    if(typeof _addon["doLifeCycle"] === "function") {
-                        let _listeners = _addon.lifecycles;
-                        for(let _lifecycle of _listeners) {
-                            let _addonListenerSet = this._listeners.get(_lifecycle);
-                            if(typeof _addonListenerSet === "undefined") {
-                                _addonListenerSet = new Set();
-                                this._listeners.set(_lifecycle, _addonListenerSet);
-                            }
-                            _addonListenerSet.add(_addon);
-                        }
                     }
                 }
                 azcontext.log.info("[AddOnManager.install(azcontext, parse, cfp, atp)]: Add-On's installed successfully.");
@@ -2396,7 +2489,7 @@ class AddOnManager {
             for(/**@type{(AddOn|{constructor})}*/let _addon of this._target) {
                 azcontext.log.info("[AddOnManager.initialize(azcontext, config)]: Initializing Add-On " +
                     _addon.constructor.name + ":" + _addon.constructor.$object.addOn + ".");
-                _promises.push(_addon.initialize(azcontext, config));
+                _promises.push(_addon.install(azcontext, config, this));
             }
             await Promise.all(_promises);
             azcontext.log.info("[AddOnManager.initialize(azcontext, parse, cfp, atp)]: Add-On initialization successful.");
@@ -2407,12 +2500,10 @@ class AddOnManager {
      * @return {Promise<void>}
      */
     async ready(azcontext) {
-        this._ready = true;
-        let _ready = this._target.length > 0;
-        delete this._target;
         this._unresolved.clear();
         delete this._unresolved;
-        if(_ready) azcontext.log.info("[AddOnManager.ready(azcontext)]: Add-On's ready.");
+        this._ready = true;
+        azcontext.log.info("[AddOnManager.ready(azcontext)]: Add-On's ready.");
     }
 }
 /**
@@ -2433,7 +2524,6 @@ class Configuration {
     /**@type{string}*/static PROP_LOCAL_DEV = "celastringjs.core.property.deployment.local.development";
     /**@type{string}*/static PROP_CONFIG_PROPERTY = "celastringjs.core.config.property";
     /**@type{string}*/static PROP_CONFIG_MI_OVERRIDE = "celastringjs.core.config.mi.override";
-
     /**
      * @param{string} name
      * @param {(null|string)} [property=null]
@@ -2581,34 +2671,6 @@ class Configuration {
                 AddOn.$object.type + "'.", "addon");
         this._addons.add(addon);
         return this;
-    }
-    /**
-     * @param {(Class<AddOn>|string)} addon
-     * @return {Promise<boolean>}
-     */
-    async hasAddOn(addon) {
-        return this.hasAddOnSync(addon);
-    }
-    /**
-     * @param {(Class<AddOn>|string)} addon
-     * @return {boolean}
-     */
-    hasAddOnSync(addon) {
-        return this._addons.has(addon);
-    }
-    /**
-     * @param {(Class<AddOn>|string)} name
-     * @return {Promise<AddOn>}
-     */
-    async getAddOn(name) {
-        return this.getAddOnSync(name);
-    }
-    /**
-     * @param {(Class<AddOn>|string)} name
-     * @return {AddOn}
-     */
-    getAddOnSync(name) {
-        return this._addons.get(name);
     }
     /**
      * @param {AttributeParser} parser
@@ -3771,77 +3833,6 @@ class Context {
     }
 }
 /**
- * CelastrinaFunction
- * @author Robert R Murrell
- * @abstract
- */
-class CelastrinaFunction {
-    /**@return{Object}*/static get $object() {return {schema: "https://celastrinajs/schema/v1.0.0/core/CelastrinaFunction#",
-                                                      type: "celastrinajs.core.CelastrinaFunction"}};
-    constructor(configuration) {}
-    /**
-     * @param {Configuration} config
-     * @return {Promise<Context>}
-     */
-    async createContext(config) {return new Context(config);}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async initialize(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<Subject>}
-     */
-    async authenticate(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async authorize(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async validate(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async monitor(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async load(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async process(context) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async save(context) {}
-    /**
-     * @param {Context} context
-     * @param {*} exception
-     * @return {Promise<void>}
-     */
-    async exception(context, exception) {}
-    /**
-     * @param {Context} context
-     * @return {Promise<void>}
-     */
-    async terminate(context) {}
-    /**
-     * @brief Method called by the Azure Function to execute the lifecycle.
-     * @param {_AzureFunctionContext} azcontext The azcontext of the function.
-     */
-    async execute(azcontext) {}
-}
-/**
  * BaseFunction
  * @abstract
  * @author Robert R Murrell
@@ -3901,8 +3892,8 @@ class BaseFunction extends CelastrinaFunction {
      * @return {Promise<void>}
      */
     async _initialize(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.INITIALIZE, this, context);
-        return this.initialize(context);
+        await this.initialize(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.INITIALIZE, this, context);
     }
     /**
      * @description If you want an add-on to change authentication behavior you must do it through the Sentry at
@@ -3912,7 +3903,7 @@ class BaseFunction extends CelastrinaFunction {
      */
     async _authenticate(context) {
         context.subject = await this.authenticate(context); // Do authentication first so Add-On's can circumvent it.
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.AUTHENTICATE, this, context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AUTHENTICATE, this, context);
     }
     /**
      * @description If you want an add-on to change authorization behavior you must do it through the Sentry at
@@ -3922,47 +3913,52 @@ class BaseFunction extends CelastrinaFunction {
      */
     async _authorize(context) {
         await this.authorize(context); // Do authorization first so Add-On's can circumvent it.
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.AUTHORIZE, this, context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AUTHORIZE, this, context);
     }
     /**
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _validate(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.VALIDATE, this, context);
-        return this.validate(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_VALIDATE, this, context);
+        await this.validate(context);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_VALIDATE, this, context);
     }
     /**
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _load(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.LOAD, this, context);
-        return this.load(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_LOAD, this, context);
+        await this.load(context);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_LOAD, this, context);
     }
     /**
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _monitor(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.MONITOR, this, context);
-        return this.monitor(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_MONITOR, this, context);
+        await this.monitor(context);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_MONITOR, this, context);
     }
     /**
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _process(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.PROCESS, this, context);
-        return this.process(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_PROCESS, this, context);
+        await this.process(context);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_PROCESS, this, context);
     }
     /**
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _save(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.SAVE, this, context);
-        return this.save(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_SAVE, this, context);
+        await this.save(context);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_SAVE, this, context);
     }
     /**
      * @param {Context} context
@@ -3970,16 +3966,18 @@ class BaseFunction extends CelastrinaFunction {
      * @return {Promise<void>}
      */
     async _exception(context, exception) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.EXCEPTION, this, context, exception);
-        return this.exception(context, exception);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_EXCEPTION, this, context, exception);
+        await this.exception(context, exception);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_EXCEPTION, this, context, exception);
     }
     /**
      * @param {Context} context
      * @return {Promise<void>}
      */
     async _terminate(context) {
-        await context.config.addOns.doLifeCycle(LifeCycle.STATE.TERMINATE, this, context);
-        return this.terminate(context);
+        await context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.BEFORE_TERMINATE, this, context);
+        await this.terminate(context);
+        return context.config.addOns.fireAddOnEvent(AddOnEvent.TYPE.AFTER_TERMINATE, this, context);
     }
     /**
       * @brief Method called by the Azure Function to execute the lifecycle.
@@ -3992,8 +3990,7 @@ class BaseFunction extends CelastrinaFunction {
             await this._initialize(this._context);
             await this._authenticate(this._context);
             await this._authorize(this._context);
-            if (this._context.isMonitorInvocation)
-                await this._monitor(this._context);
+            if(this._context.isMonitorInvocation) await this._monitor(this._context);
             else {
                 await this._validate(this._context);
                 await this._load(this._context);
@@ -4003,11 +4000,11 @@ class BaseFunction extends CelastrinaFunction {
         }
         catch(error) {
             try {
-                _err = this._toCelastrinaError(azcontext, error);
+                _err = this.toCelastrinaError(azcontext, error);
                 if(this._context != null) await this._exception(this._context, _err);
             }
             catch(ierror) {
-                _err = this._toCelastrinaError(azcontext, ierror);
+                _err = this.toCelastrinaError(azcontext, ierror);
             }
         }
         finally {
@@ -4015,29 +4012,27 @@ class BaseFunction extends CelastrinaFunction {
                 if(this._context != null) await this._terminate(this._context);
             }
             catch(ierror) {
-                _err = this._toCelastrinaError(azcontext, ierror);
+                _err = this.toCelastrinaError(azcontext, ierror);
             }
         }
-        if(_err != null) await this._onError(azcontext, this._context, _err);
+        if(_err != null) await this.handleError(azcontext, this._context, _err);
     }
     /**
      * @param {_AzureFunctionContext} azcontext
      * @param {Context} context
      * @param {CelastrinaError} error
      * @return {Promise<void>}
-     * @private
      */
-    async _onError(azcontext, context, error) {
+    async handleError(azcontext, context, error) {
         throw error;
     }
     /**
      * @param {_AzureFunctionContext} azcontext
      * @param {*} error
-     * @private
      */
-    _toCelastrinaError(azcontext, error) {
+    toCelastrinaError(azcontext, error) {
         /**@type{CelastrinaError}*/let _err = CelastrinaError.wrapError(error);
-        azcontext.log.error("[BaseFunction._toCelastrinaError(context, exception)][error]:\r\n(MESSAGE: " + _err.message +
+        azcontext.log.error("[BaseFunction.toCelastrinaError(context, exception)][error]:\r\n(MESSAGE: " + _err.message +
                             ")\r\n(STACK: " + _err.stack + ")\r\n(CAUSE: " + _err.cause + ")");
         return _err;
     }
@@ -4065,14 +4060,15 @@ module.exports = {
     AppSettingsPropertyManagerFactory: AppSettingsPropertyManagerFactory,
     AppConfigPropertyManagerFactory: AppConfigPropertyManagerFactory,
     AttributeParser: AttributeParser,
+    ConfigParser: ConfigParser,
     RoleFactoryParser: RoleFactoryParser,
     PrincipalMappingParser: PrincipalMappingParser,
     CachePropertyParser: CachePropertyParser,
     AppRegistrationResourceParser: AppRegistrationResourceParser,
-    ConfigParser: ConfigParser,
-    LifeCycle: LifeCycle,
-    AddOnManager: AddOnManager,
+    AddOnEventHandler: AddOnEventHandler,
+    AddOnEvent: AddOnEvent,
     AddOn: AddOn,
+    AddOnManager: AddOnManager,
     Configuration: Configuration,
     Algorithm: Algorithm,
     AES256Algorithm: AES256Algorithm,
