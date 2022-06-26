@@ -38,12 +38,12 @@ class MockAddOn extends AddOn {
      */
     constructor(dependencies = []) {
         super(dependencies);
-        this.invokedGetConfigParser = false;
+        this.invokedGetConfigLoader = false;
         this.invokedGetAttributeParser = false;
         this.invokedInstall = false;
     }
     reset() {
-        this.invokedGetConfigParser = false;
+        this.invokedGetConfigLoader = false;
         this.invokedGetAttributeParser = false;
         this.invokedInstall = false;
     }
@@ -51,8 +51,8 @@ class MockAddOn extends AddOn {
         this._dependencies.add(name);
         return this;
     }
-    getConfigParser() {
-        this.invokedGetConfigParser = true;
+    getConfigLoader() {
+        this.invokedGetConfigLoader = true;
         return null;
     }
     getAttributeParser() {
@@ -110,7 +110,7 @@ describe("Configuration", () => {
         });
         it("Should load with null.", () => {
             let _loader = new Configuration("ConfigurationTest");
-            assert.strictEqual(_loader.configParser, null, "Expected configParser to be null.");
+            assert.strictEqual(_loader.configLoader, null, "Expected configParser to be null.");
             assert.strictEqual(_loader.contentParser, null, "Expected contentParser to be null.");
         });
         it("Should fail with 0 length string", () => {
@@ -367,7 +367,7 @@ describe("Configuration", () => {
             let _addon = new MockAddOn();
             _config.addOn(_addon);
             await _config.initialize(_azcontext);
-            assert.strictEqual(_addon.invokedGetConfigParser, true, "Expected to invoke getConfigParser.");
+            assert.strictEqual(_addon.invokedGetConfigLoader, true, "Expected to invoke getConfigParser.");
             assert.strictEqual(_addon.invokedGetAttributeParser, true, "Expected to invoke getAttributeParser.");
             assert.strictEqual(_addon.invokedInstall, true, "Expected to invoke install.");
         });
