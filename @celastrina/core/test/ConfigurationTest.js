@@ -22,9 +22,9 @@
  * SOFTWARE.
  */
 const {CelastrinaError, AddOn, Configuration, AppSettingsPropertyManager, AppConfigPropertyManagerFactory,
-       ResourceManager, PermissionManager, AttributeParser, ConfigParser, CelastrinaValidationError,
+       ResourceManager, PermissionManager, CelastrinaValidationError,
        AppRegistrationResource, Permission, MatchAny, MatchAll, MatchNone, AppConfigPropertyManager,
-       ManagedIdentityResource, ResourceAuthorization} = require("../Core");
+       ManagedIdentityResource} = require("../Core");
 const {MockAzureFunctionContext} = require("./AzureFunctionContextMock");
 const {MockPropertyManager} = require("./PropertyManagerTest");
 const {MockResourceManager} = require("./ResourceAuthorizationTest");
@@ -33,35 +33,40 @@ const fs = require("fs");
 
 class MockAddOn extends AddOn {
     /**@return{Object}*/static get $object() {return {addOn: "MockAddOn"};}
-    /***
+    /**
      * @param {Array<string>} dependencies
-     * @param {Array<number>} lifecycles
      */
-    constructor(dependencies = [], lifecycles = []) {
-        super(dependencies, lifecycles);
-        this.invokedGetConfigParser = false;
+    constructor(dependencies = []) {
+        super(dependencies);
+        this.invokedGetConfigLoader = false;
         this.invokedGetAttributeParser = false;
-        this.invokedInitialize = false;
+        this.invokedInstall = false;
     }
     reset() {
-        this.invokedGetConfigParser = false;
+        this.invokedGetConfigLoader = false;
         this.invokedGetAttributeParser = false;
-        this.invokedInitialize = false;
+        this.invokedInstall = false;
     }
     /**@param{string}name*/mockDependancy(name) {
         this._dependencies.add(name);
         return this;
     }
-    getConfigParser() {
-        this.invokedGetConfigParser = true;
+    getConfigLoader() {
+        this.invokedGetConfigLoader = true;
         return null;
     }
     getAttributeParser() {
         this.invokedGetAttributeParser = true;
         return null;
     }
-    async initialize(azcontext, config) {
-        this.invokedInitialize = true;
+    /**
+     * @param azcontext
+     * @param config
+     * @param {AddOnEventHandler} handler
+     * @return {Promise<void>}
+     */
+    async install(azcontext, config, handler) {
+        this.invokedInstall = true;
     }
 }
 class MockAddOnTwo extends MockAddOn {
@@ -105,7 +110,7 @@ describe("Configuration", () => {
         });
         it("Should load with null.", () => {
             let _loader = new Configuration("ConfigurationTest");
-            assert.strictEqual(_loader.configParser, null, "Expected configParser to be null.");
+            assert.strictEqual(_loader.configLoader, null, "Expected configParser to be null.");
             assert.strictEqual(_loader.contentParser, null, "Expected contentParser to be null.");
         });
         it("Should fail with 0 length string", () => {
@@ -333,37 +338,6 @@ describe("Configuration", () => {
         });
     });
     describe("AddOns", () => {
-        it("should complete add-on life cycle", async () => {
-            let _azcontext = new MockAzureFunctionContext();
-            let _config = new Configuration("mock_configuration");
-            let _pm = new MockPropertyManager();
-            let _rm = new MockResourceManager();
-            _config.setValue(Configuration.CONFIG_PROPERTY, _pm);
-            _config.setValue(Configuration.CONFIG_RESOURCE, _rm);
-            let _addon = new MockAddOn();
-            assert.deepStrictEqual(_config.addOn(_addon), _config, "Returns _config.");
-            assert.strictEqual(_config.hasAddOnSync("MockAddOn"), true, "Expected add-on to be in the config addOns.");
-        });
-        it("gets add-on", async () => {
-            let _azcontext = new MockAzureFunctionContext();
-            let _config = new Configuration("mock_configuration");
-            let _pm = new MockPropertyManager();
-            let _rm = new MockResourceManager();
-            _config.setValue(Configuration.CONFIG_PROPERTY, _pm);
-            _config.setValue(Configuration.CONFIG_RESOURCE, _rm);
-            let _addon = new MockAddOn();
-            _config.addOn(_addon);
-            assert.deepStrictEqual(await _config.getAddOn("MockAddOn"), _addon, "Expected _addon.");
-        });
-        it("not found add-on returns null", async () => {
-            let _azcontext = new MockAzureFunctionContext();
-            let _config = new Configuration("mock_configuration");
-            let _pm = new MockPropertyManager();
-            let _rm = new MockResourceManager();
-            _config.setValue(Configuration.CONFIG_PROPERTY, _pm);
-            _config.setValue(Configuration.CONFIG_RESOURCE, _rm);
-            assert.deepStrictEqual(await _config.getAddOn("MockAddOnFoozled"), null, "Expected null.");
-        });
         it("should fail with null AddOn", () => {
             let _config = new Configuration("mock_configuration");
             let _error = CelastrinaValidationError.newValidationError("Argument 'addon' is required and must be of type 'celastrinajs.core.AddOn'.", "addon");
@@ -393,9 +367,9 @@ describe("Configuration", () => {
             let _addon = new MockAddOn();
             _config.addOn(_addon);
             await _config.initialize(_azcontext);
-            assert.strictEqual(_addon.invokedGetConfigParser, true, "Expected to invoke initialize.");
-            assert.strictEqual(_addon.invokedGetAttributeParser, true, "Expected to invoke initialize.");
-            assert.strictEqual(_addon.invokedInitialize, true, "Expected to invoke initialize.");
+            assert.strictEqual(_addon.invokedGetConfigLoader, true, "Expected to invoke getConfigParser.");
+            assert.strictEqual(_addon.invokedGetAttributeParser, true, "Expected to invoke getAttributeParser.");
+            assert.strictEqual(_addon.invokedInstall, true, "Expected to invoke install.");
         });
         it("Should fail missing dependancy", async () => {
             let _azcontext = new MockAzureFunctionContext();
