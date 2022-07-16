@@ -10,11 +10,11 @@ will continue to adapt and grow with the Microsoft Azure ecosystem.
 @celastrina/core is the core support library for all celastrina add-ons. You can find available add-ons here:
 
 - [@celastrina/http](https://www.npmjs.com/package/@celastrina/http): For use with Azure Function HTTP triggers.
-- [@celastrina/timer](https://www.npmjs.com/package/@celastrina/timer): For user with Azure Function Timer triggers.
+- [@celastrina/captcha](https://www.npmjs.com/package/@celastrina/captcha): Adds captcha support to HTTP triggers.
+- [@celastrina/timer](https://www.npmjs.com/package/@celastrina/timer): For use with Azure Function Timer triggers.
 
 ## Coming Soon
 The project team is currently working on add-ons for:
-- CAPTCH with default Google RECAPTCHA support.
 - Cloud Events, both HTTP and or async triggers from EventGrid or Storage Queue.
 - Async Messages from Service Bus or Storage Queue.
 - Semaphore and Data Binding.
