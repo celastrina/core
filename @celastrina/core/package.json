@@ -1,6 +1,6 @@
 {
   "name": "@celastrina/core",
-  "version": "4.17.45",
+  "version": "4.17.46",
   "description": "Javascript Framework for simplifying Microsoft Azure Functions and supporting resources.",
   "main": "Core.js",
   "scripts": {
@@ -28,7 +28,7 @@
     "@azure/identity": "^2.0.1",
     "adal-node": "^0.2.2",
     "axios": "^0.21.1",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "moment": "^2.29.1",
     "querystring": "^0.2.1",
     "uuid": "^8.3.2"
